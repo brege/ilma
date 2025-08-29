@@ -99,7 +99,7 @@ TREE_EXCLUDES+="|node_modules|dist"
 - `MAX_ARCHIVES` - Number of compressed archives to keep (default: 1)
 
 ### XDG Directory Backup
-- `BACKUP_XDG_DIRS` - Backup user config directories (default: false)  
+- `BACKUP_XDG_DIRS` - Backup user config directories (default: false)
 - `XDG_PATHS` - Directories to check (default: `~/.config` `~/.local/share` `~/.cache`)
 
 ### File Tracking
@@ -167,7 +167,6 @@ RSYNC_EXCLUDES+=(
     --exclude '*.fdb_latexmk'
     --exclude '*.fls'
     --exclude '*.synctex.gz'
-    --exclude '*.bbl'
     --exclude '*.blg'
     --exclude '*.run.xml'
     --exclude '*.bcf'
@@ -190,9 +189,9 @@ TREE_EXCLUDES+="|_minted-*"
 ### Default Structure (nested)
 ```
 ~/build/
-├── project.bak/          # Full backup
-│   ├── ...              # Complete 1:1 copy
-│   └── project/         # Context mirror (LLM-ready)
+├── project.bak/               # Full backup
+│   ├── ...                    # Complete 1:1 copy
+│   └── project/               # Context mirror (LLM-ready)
 └── project-timestamp.tar.zst  # Optional compressed archive
 ```
 
