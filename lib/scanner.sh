@@ -95,13 +95,13 @@ fi
 
 # Get composite exclusions from all config files
 SCRIPT_DIR="$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")"
-eval "$("$SCRIPT_DIR/composite-excludes.sh" "$SCRIPT_DIR/../examples"/*.conf)"
+eval "$("$SCRIPT_DIR/excludes.sh" "$SCRIPT_DIR/../examples"/*.conf)"
 
 # Merge config-specific junk dirs with composite exclusions, removing duplicates  
 ALL_JUNK_DIRS=("${JUNK_DIRS[@]}")
 for common_dir in "${SKIP_DIRS[@]}"; do
     # Add if not already present
-    if [[ ! " ${JUNK_DIRS[*]} " =~ " ${common_dir} " ]]; then
+    if [[ ! " ${JUNK_DIRS[*]} " =~ \ ${common_dir}\  ]]; then
         ALL_JUNK_DIRS+=("$common_dir")
     fi
 done
@@ -137,7 +137,7 @@ for dir_pattern in "${ALL_JUNK_DIRS[@]}"; do
     FIND_EXCLUDE_ARGS+=(-name "${dir_pattern}" -o)
 done
 if (( ${#FIND_EXCLUDE_ARGS[@]} > 0 )); then
-    unset FIND_EXCLUDE_ARGS[-1]  # Remove trailing -o
+    unset 'FIND_EXCLUDE_ARGS[-1]'  # Remove trailing -o
 fi
 
 # Find source files based on EXTENSIONS using efficient mapfile with exclusions
@@ -198,7 +198,7 @@ if (( STATS == 1 )); then
     done
     # Remove the trailing -o
     if (( ${#EXCLUDE_ARGS[@]} > 0 )); then
-        unset EXCLUDE_ARGS[-1]
+        unset 'EXCLUDE_ARGS[-1]'
     fi
     
     # Find project directories with composite exclusions

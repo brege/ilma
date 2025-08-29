@@ -11,7 +11,7 @@ BLUE='\033[0;34m'
 RESET='\033[0m'
 
 SCRIPT_DIR="$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")"
-EXAMPLES_DIR="$SCRIPT_DIR/../examples"
+EXAMPLES_DIR="$SCRIPT_DIR/../configs"
 
 # Find all .ilma.conf files
 mapfile -t config_files < <(find "$EXAMPLES_DIR" -maxdepth 1 -type f -name '*.ilma.conf' | sort)

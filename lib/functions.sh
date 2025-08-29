@@ -16,15 +16,25 @@ git-count-lines() {
   fi
 
   count_lines() {
-    awk '{s+=$1} END {print s}' <<<"$(xargs -d '\n' wc -l < <(printf '%s\n' "$@"))"
+    # Filter out files that don't exist before passing to wc
+    local existing_files=()
+    for file in "$@"; do
+      [[ -f "$file" ]] && existing_files+=("$file")
+    done
+    
+    if [[ ${#existing_files[@]} -gt 0 ]]; then
+      awk '{s+=$1} END {print s}' <<<"$(xargs -d '\n' wc -l < <(printf '%s\n' "${existing_files[@]}"))"
+    else
+      echo 0
+    fi
   }
 
   # Check for git repo and .gitignore
   if git -C "$dir" rev-parse --is-inside-work-tree &>/dev/null && [[ -f "$dir/.gitignore" ]]; then
     # Use git ls-files (respects .gitignore)
     if [[ $# -eq 0 ]]; then
-      git -C "$dir" ls-files | awk -F. 'NF>1{print $NF}' | sort | uniq | while read ext; do
-        files=($(git -C "$dir" ls-files "*.$ext"))
+      git -C "$dir" ls-files | awk -F. 'NF>1{print $NF}' | sort | uniq | while read -r ext; do
+        mapfile -t files < <(git -C "$dir" ls-files "*.$ext")
         [ ${#files[@]} -eq 0 ] && continue
         num_files=${#files[@]}
         num_lines=$(count_lines "${files[@]}")
@@ -33,7 +43,7 @@ git-count-lines() {
     else
       for pattern in "$@"; do
         pattern="${pattern//\'/}"
-        files=($(git -C "$dir" ls-files "$pattern"))
+        mapfile -t files < <(git -C "$dir" ls-files "$pattern")
         num_files=${#files[@]}
         if ((num_files == 0)); then
           printf "%-10s %4d files %7d lines\n" "$pattern:" 0 0
@@ -46,8 +56,8 @@ git-count-lines() {
   else
     # Not a git repo, or no .gitignore: use find (does NOT ignore anything)
     if [[ $# -eq 0 ]]; then
-      find "$dir" -type f | awk -F. 'NF>1{print $NF}' | sort | uniq | while read ext; do
-        files=($(find "$dir" -type f -name "*.$ext"))
+      find "$dir" -type f | awk -F. 'NF>1{print $NF}' | sort | uniq | while read -r ext; do
+        mapfile -t files < <(find "$dir" -type f -name "*.$ext")
         [ ${#files[@]} -eq 0 ] && continue
         num_files=${#files[@]}
         num_lines=$(count_lines "${files[@]}")
@@ -56,7 +66,7 @@ git-count-lines() {
     else
       for pattern in "$@"; do
         pattern="${pattern//\'/}"
-        files=($(find "$dir" -type f -name "$pattern"))
+        mapfile -t files < <(find "$dir" -type f -name "$pattern")
         num_files=${#files[@]}
         if ((num_files == 0)); then
           printf "%-10s %4d files %7d lines\n" "$pattern:" 0 0
