@@ -42,6 +42,35 @@ ilma -c
 ilma /path/to/project -c
 ```
 
+### Console
+
+**`ilma`** has a built-in statistics view that shows file counts, line counts, and size reduction analysis.
+
+``` text
+> ~/thunder-muscle$ ilma console
+
+  Mirror Reduction Stats
+  ----------------------
+  Metric                 Source     Mirror      Delta Reduction
+  -----                  ------     ------      ----- --------
+  Total files              3249         50       3199    98.5%
+  .py files                1260         10       1250    99.2%
+  .md files                   5          3          2    40.0%
+  .json files                16         12          4    25.0%
+  Total lines           2182245    1453607     728638    33.4%
+  .py lines              372962       1954     371008    99.5%
+  .md lines                 482        254        228    47.3%
+  .json lines           1444974    1444364        610     0.0%
+  Total size (MB)           288        196         92    31.9%
+  ----------------------
+  Mirror token estimate: 51331435 (~4 chars per token)
+  git: [ commits: 9 ][ latest: 2025-08-29:16:42 (64ebf25) docs: update README.md ]
+  tip: ilma console (this display) | ilma --help
+```
+This overview is useful for quickly evaluating the impact your source code might have in an LLM's context window.
+
+Using `ilma` from your project root will automatically create a minimal snapshot of your project in the same parent directory as the project itself. An `.ilma.conf` in the source root allows finer control over replaceable assets to duplicate.
+
 ## Default Configuration
 
 By default, ilma uses minimal exclusions and tracks basic file types:
@@ -181,7 +210,6 @@ CONTEXT_FILES=(
 TREE_EXCLUDES+="|_minted-*"
 ```
 
-
 ## ABC Architecture
 
 **`ilma`** implements an Archive-Backup-Context pattern:
@@ -203,15 +231,6 @@ TREE_EXCLUDES+="|_minted-*"
 └── context/project/                   # Context mirrors
 ```
 
-## Output
-
-**`ilma`** creates:
-1. **Archive** - Optional compressed timestamped .tar.zst files with rotation
-2. **Backup** - Complete 1:1 copy at `$BACKUP_BASE_DIR/project.bak/`
-3. **Context** - LLM-ready mirror at `$CONTEXT_BASE_DIR/project/` or nested
-4. **Statistics** - File counts, line counts, size reduction analysis
-5. **Tree file** - Project structure snapshot in context mirror
 
 ## License
-
 [GPLv3](https://www.gnu.org/licenses/gpl-3.0.txt)

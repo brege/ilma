@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# lib/skip-paths.sh - General-purpose dry-run skip printer with LaTeX-style project detection
+# lib/scan.sh - General-purpose dry-run skip printer with LaTeX-style project detection
 
 set -euo pipefail
 
@@ -42,8 +42,8 @@ Usage: $0 [--type TYPE] [--pretty] [directory]
   --pretty        Human-friendly output with colors and headers
   directory       Directory to scan for projects (default: current dir)
 
-This tool scans directories containing .tex files as projects, and outputs
-junk file paths according to the selected TYPE's exclude patterns.
+This tool scans directories for projects and outputs junk file paths
+according to the selected TYPE's exclude patterns.
 
 Default: machine-readable paths only (safe for piping)
 With --pretty: human-friendly display with project context
@@ -116,14 +116,15 @@ if [[ "$PRETTY_OUTPUT" == "true" ]]; then
     echo
 fi
 
-# Find project directories containing .tex files
-mapfile -t project_dirs < <(find "$DIR" -type f -name '*.tex' -exec dirname {} \; | sort -u)
+# For now, treat the specified directory as the project directory
+# This can be enhanced later with type-specific project detection
+project_dirs=("$DIR")
 
-if (( ${#project_dirs[@]} == 0 )); then
+if [[ ! -d "$DIR" ]]; then
     if [[ "$PRETTY_OUTPUT" == "true" ]]; then
-        echo "No projects (.tex files) found in $DIR."
+        echo "Directory not found: $DIR"
     fi
-    exit 0
+    exit 1
 fi
 
 PRUNE_DIRS=(.git node_modules .svn)
