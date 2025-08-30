@@ -127,9 +127,19 @@ if [[ ! -d "$DIR" ]]; then
     exit 1
 fi
 
-PRUNE_DIRS=(.git node_modules .svn)
+# Build prune expression from parsed JUNK_DIRS (from RSYNC_EXCLUDES)
+# Always exclude backup directories created by ilma
+BACKUP_DIRS=(backup)
+ALL_PRUNE_DIRS=("${JUNK_DIRS[@]}")
+# Add backup directories and .bak pattern
+for dir in "${BACKUP_DIRS[@]}"; do
+    ALL_PRUNE_DIRS+=("$dir")
+done
+# Add .bak pattern matching
+ALL_PRUNE_DIRS+=("*.bak")
+
 PRUNE_EXPR=""
-for pd in "${PRUNE_DIRS[@]}"; do
+for pd in "${ALL_PRUNE_DIRS[@]}"; do
     [[ -n "$PRUNE_EXPR" ]] && PRUNE_EXPR+=" -o "
     PRUNE_EXPR+="-name $pd"
 done
