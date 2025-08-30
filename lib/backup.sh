@@ -205,14 +205,8 @@ create_archive() {
                 archive_dir="$(dirname "$archive_file")"
             fi
         else
-            # Resolve archive directory relative to project directory, not current directory
-            if [[ "${ARCHIVE_BASE_DIR}" == /* ]]; then
-                # Absolute path
-                archive_dir="$(realpath "${ARCHIVE_BASE_DIR/#\~/$HOME}")"
-            else
-                # Relative path - resolve relative to project directory
-                archive_dir="$(realpath "$project_root/${ARCHIVE_BASE_DIR}")"
-            fi
+            # Use archive directory as configured (already resolved in config.sh)
+            archive_dir="$(realpath "${ARCHIVE_BASE_DIR/#\~/$HOME}")"
             mkdir -p "$archive_dir"
             timestamp="$(date '+%Y%m%d-%H%M%S')"
             archive_file="$archive_dir/${project_name}-${timestamp}.tar.zst"

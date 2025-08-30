@@ -174,6 +174,49 @@ EOF
 # Create some build artifacts
 touch "$LATEX_DIR/main.aux" "$LATEX_DIR/main.log" "$LATEX_DIR/main.pdf"
 
+# --- Add Python junk to dummy-project-python ---
+echo "  Adding Python junk files..."
+# Create __pycache__ with .pyc files
+mkdir -p "$PYTHON_DIR/__pycache__" "$PYTHON_DIR/src/__pycache__"
+echo "compiled bytecode" > "$PYTHON_DIR/__pycache__/main.cpython-39.pyc"
+echo "compiled bytecode" > "$PYTHON_DIR/src/__pycache__/helper.cpython-39.pyc"
+
+# Create realistic venv with nested structure like thunder-muscle
+mkdir -p "$PYTHON_DIR/venv/lib/python3.13/site-packages/pip/_internal/cli/__pycache__" \
+         "$PYTHON_DIR/venv/lib/python3.13/site-packages/setuptools/__pycache__" \
+         "$PYTHON_DIR/venv/bin" \
+         "$PYTHON_DIR/venv/include"
+
+# Create executable files in bin
+echo "#!/usr/bin/env python" > "$PYTHON_DIR/venv/bin/python"
+echo "#!/usr/bin/env python" > "$PYTHON_DIR/venv/bin/pip"
+chmod +x "$PYTHON_DIR/venv/bin/python" "$PYTHON_DIR/venv/bin/pip"
+
+# Create venv config files
+echo "home = /usr/bin
+include-system-site-packages = false
+version = 3.13.0
+executable = /usr/bin/python3.13" > "$PYTHON_DIR/venv/pyvenv.cfg"
+
+# Create deep nested package structure with many files
+for i in {1..20}; do
+    echo "compiled bytecode $i" > "$PYTHON_DIR/venv/lib/python3.13/site-packages/pip/_internal/cli/__pycache__/file$i.cpython-313.pyc"
+    echo "setup code $i" > "$PYTHON_DIR/venv/lib/python3.13/site-packages/setuptools/__pycache__/setup$i.cpython-313.pyc"
+done
+
+# Create symlink (lib64 -> lib)
+ln -sf lib "$PYTHON_DIR/venv/lib64"
+
+# Create .pytest_cache
+mkdir -p "$PYTHON_DIR/.pytest_cache/v"
+echo "cache data" > "$PYTHON_DIR/.pytest_cache/README.md"
+echo "pytest data" > "$PYTHON_DIR/.pytest_cache/v/cache.json"
+
+# Create dist and build dirs
+mkdir -p "$PYTHON_DIR/dist" "$PYTHON_DIR/build/lib"
+echo "wheel file" > "$PYTHON_DIR/dist/package-1.0-py3-none-any.whl"
+echo "build artifact" > "$PYTHON_DIR/build/lib/main.py"
+
 # --- Dummy Project with Recursion Risk ---
 echo "  Creating dummy-project-recursive..."
 RECURSIVE_DIR="$TARGET_DIR/dummy-project-recursive"

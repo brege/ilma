@@ -22,6 +22,8 @@ OPTIONS:
   --type TYPE                          Use project type configuration
   --pretty                             Show detailed output (for scan command)
   --verbose                            Show detailed output (for prune command)
+  --bak                                Create backup then delete junk files (for prune command)
+  --delete                             Delete junk files without backup (for prune command)
   -h, --help                           Show this help
 
 PROJECT TYPES:
@@ -35,6 +37,8 @@ EXAMPLES:
   ilma console                         Show project statistics
   ilma scan --type python --pretty     Scan Python project with detailed output
   ilma prune --type latex --verbose    Analyze LaTeX project cruft (dry-run only)
+  ilma prune --type python --bak       Backup Python project then delete junk
+  ilma prune --type latex --delete     Delete LaTeX project junk (no backup)
   ilma config                          Show effective configuration
 
 CONFIGURATION:
@@ -53,6 +57,8 @@ CONFIG_FLAG=""
 PROJECT_ROOT=""
 VERBOSE_FLAG=""
 PRETTY_FLAG=""
+BAK_FLAG=""
+DELETE_FLAG=""
 
 # First pass - scan all arguments to identify command
 COMMAND="backup"  # Default command
@@ -100,6 +106,14 @@ while (( $# > 0 )); do
             ;;
         --pretty)
             PRETTY_FLAG="true"
+            shift
+            ;;
+        --bak)
+            BAK_FLAG="true"
+            shift
+            ;;
+        --delete)
+            DELETE_FLAG="true"
             shift
             ;;
         backup|console|scan|prune|config)
@@ -180,12 +194,56 @@ case "$COMMAND" in
         "$ILMA_DIR/lib/scan.sh" "${scan_args[@]}"
         ;;
     prune)
-        # Load config without special mode handling for prune
+        # Load config
         source "$ILMA_DIR/lib/config.sh" 
         load_config "$PROJECT_ROOT" "$TYPE"
-        # Don't call handle_special_modes for prune command
+        # Only call handle_special_modes if backup is needed (for --bak flag)
+        if [[ "$BAK_FLAG" == "true" ]]; then
+            handle_special_modes "" "$PROJECT_ROOT"
+        fi
         source "$ILMA_DIR/lib/prune.sh"
-        do_prune "$PROJECT_ROOT" "${VERBOSE_FLAG:-false}" "$TYPE"
+        
+        # Determine if we're in delete mode
+        delete_mode="false"
+        if [[ "$BAK_FLAG" == "true" || "$DELETE_FLAG" == "true" ]]; then
+            delete_mode="true"
+        fi
+        
+        # If --bak flag is set, create complete backup first
+        if [[ "$BAK_FLAG" == "true" ]]; then
+            echo "Creating complete backup before deletion..."
+            PROJECT_NAME="$(basename "$PROJECT_ROOT")"
+            PARENT_DIR="$(dirname "$PROJECT_ROOT")"
+            TIMESTAMP="$(date '+%Y%m%d-%H%M%S')"
+            BACKUP_ARCHIVE="$PARENT_DIR/${PROJECT_NAME}.orig.tar.zst"
+            
+            if tar --zstd -cf "$BACKUP_ARCHIVE" -C "$PROJECT_ROOT" .; then
+                echo "Complete backup created: $BACKUP_ARCHIVE"
+            else
+                echo "ERROR: Failed to create backup archive"
+                exit 1
+            fi
+            echo
+            echo "Backup complete. Now proceeding with junk file deletion..."
+            echo
+        fi
+        
+        # Run prune analysis (and deletion if requested)
+        do_prune "$PROJECT_ROOT" "${VERBOSE_FLAG:-false}" "$TYPE" "$delete_mode"
+        
+        # Show stats after backup completion if backup was created
+        if [[ "$BAK_FLAG" == "true" && "$CONFIG_FOUND" == "true" ]]; then
+            echo
+            if [[ -n "$CONTEXT_BASE_DIR" ]]; then
+                MIRROR_DIR="$CONTEXT_BASE_DIR/$PROJECT_NAME"
+            else
+                MAIN_BACKUP_DIR="$BACKUP_BASE_DIR/${PROJECT_NAME}.bak"
+                MIRROR_DIR="$MAIN_BACKUP_DIR/$PROJECT_NAME"
+            fi
+            
+            source "$ILMA_DIR/lib/console.sh"
+            show_backup_stats "$PROJECT_ROOT" "$MIRROR_DIR"
+        fi
         ;;
     config)
         show_config "$PROJECT_ROOT"
