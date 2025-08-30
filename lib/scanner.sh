@@ -47,9 +47,9 @@ ILMA_DIR="$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.."
 
 if [[ -n "$CONFIG_TYPE" ]]; then
     case "$CONFIG_TYPE" in
-        latex) CONFIG_FILE="$ILMA_DIR/examples/latex-project.ilma.conf" ;;
-        node) CONFIG_FILE="$ILMA_DIR/examples/node-project.ilma.conf" ;;
-        python) CONFIG_FILE="$ILMA_DIR/examples/python-project.ilma.conf" ;;
+        latex) CONFIG_FILE="$ILMA_DIR/configs/latex-project.ilma.conf" ;;
+        node) CONFIG_FILE="$ILMA_DIR/configs/node-project.ilma.conf" ;;
+        python) CONFIG_FILE="$ILMA_DIR/configs/python-project.ilma.conf" ;;
         *) echo "Error: Unknown config type '$CONFIG_TYPE'"; exit 1 ;;
     esac
 elif [[ -z "$CONFIG_FILE" ]]; then
@@ -95,7 +95,7 @@ fi
 
 # Get composite exclusions from all config files
 SCRIPT_DIR="$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")"
-eval "$("$SCRIPT_DIR/excludes.sh" "$SCRIPT_DIR/../examples"/*.conf)"
+eval "$("$SCRIPT_DIR/excludes.sh" "$SCRIPT_DIR/../configs"/*.conf)"
 
 # Merge config-specific junk dirs with composite exclusions, removing duplicates  
 ALL_JUNK_DIRS=("${JUNK_DIRS[@]}")
