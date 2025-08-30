@@ -218,11 +218,29 @@ create_archive() {
             archive_file="$archive_dir/${project_name}-${timestamp}.tar.zst"
         fi
         
-        # Create the archive in temp location to avoid "file changed as we read it"
-        temp_archive="/tmp/ilma-temp-$(basename "$archive_file")"
-        if tar --zstd -cf "$temp_archive" -C "$project_root" --exclude="*.tar.zst" --exclude="*.tar.gz" . 2>/dev/null && mv "$temp_archive" "$archive_file"; then
+        # Convert RSYNC_EXCLUDES to tar exclude patterns
+        tar_excludes=()
+        for exclude in "${RSYNC_EXCLUDES[@]}"; do
+            if [[ "$exclude" != "--exclude" ]]; then
+                # Convert rsync patterns to tar patterns
+                # rsync: '.git/' -> tar: './.git' (tar sees paths starting with ./)
+                local tar_pattern="$exclude"
+                if [[ "$tar_pattern" == *"/" ]]; then
+                    # Remove trailing slash and prepend ./
+                    tar_pattern="./${tar_pattern%/}"
+                elif [[ "$tar_pattern" != ./* && "$tar_pattern" != "*"* ]]; then
+                    # Prepend ./ for literal paths that don't start with ./ or contain *
+                    tar_pattern="./$tar_pattern"
+                fi
+                tar_excludes+=(--exclude="$tar_pattern")
+            fi
+        done
+        
+        # Create archive directly in target location with verbosity
+        echo "  - Creating archive: $archive_file"
+        if tar --zstd -cvf "$archive_file" -C "$project_root" "${tar_excludes[@]}" .; then
             archive_size=$(du -sh "$archive_file" | cut -f1)
-            echo "  - Created archive: $archive_file ($archive_size)"
+            echo "  - Archive created successfully: $archive_size"
             
             # Rotate old archives if MAX_ARCHIVES > 0
             if [[ "$MAX_ARCHIVES" -gt 0 && -z "$archive_flag" ]]; then
@@ -252,7 +270,7 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     # Load configuration first
     source "$ILMA_DIR/lib/config.sh"
     load_config "$PROJECT_ROOT"
-    handle_special_modes "$ARCHIVE_FLAG"
+    handle_special_modes "$ARCHIVE_FLAG" "$PROJECT_ROOT"
     
     # Perform backup
     do_backup "$PROJECT_ROOT"

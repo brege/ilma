@@ -54,6 +54,7 @@ load_config() {
 # Handle special modes (archive flag, fallback, etc.)
 handle_special_modes() {
     local archive_flag="$1"
+    local project_root="$2"
     
     if [[ -n "$archive_flag" ]]; then
         # --archive mode: force archive creation
@@ -66,12 +67,22 @@ handle_special_modes() {
         echo "Archive mode: creating complete image at $archive_flag"
     elif [[ "$CONFIG_FOUND" == "false" ]]; then
         # Fallback/type-only mode: if no local config found, create simple archive in current directory
-        # Keep type-specific exclusions if type config was loaded, otherwise no exclusions
+        # Keep type-specific exclusions if type config was loaded, otherwise use safe defaults
         if [[ "$TYPE_CONFIG_LOADED" == "false" ]]; then
-            RSYNC_EXCLUDES=()  # No exclusions - archive everything
+            # SAFETY: Always exclude critical directories even in fallback mode
+            RSYNC_EXCLUDES=(
+                --exclude '.git/'
+                --exclude '.svn/' 
+                --exclude '.hg/'
+                --exclude '.bzr/'
+                --exclude '*.tar.zst'
+                --exclude '*.tar.gz'
+                --exclude '*.tar'
+            )
         fi
         CREATE_COMPRESSED_ARCHIVE=true
-        ARCHIVE_BASE_DIR="$(pwd)"  # Explicit current working directory
+        # Archive to parent directory by default (like tar stash behavior)
+        ARCHIVE_BASE_DIR="$(dirname "$(realpath "$project_root")")"
         BACKUP_XDG_DIRS=false
         CONTEXT_BASE_DIR=""  # No context mirror in fallback mode
         
