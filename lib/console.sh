@@ -10,13 +10,13 @@ show_console_summary() {
     local project_root="$1"
     local project_name
     project_name="$(basename "$project_root")"
-    
+
     SOURCE_DIR="$project_root"
-    
+
     # Check if we have an existing mirror to compare against
     MIRROR_DIR=""
     HAS_MIRROR=false
-    
+
     if [[ "$CONFIG_FOUND" == "true" ]]; then
         # Set mirror directory path (same logic as backup.sh)
         if [[ -n "$CONTEXT_BASE_DIR" ]]; then
@@ -25,24 +25,24 @@ show_console_summary() {
             MAIN_BACKUP_DIR="$BACKUP_BASE_DIR/${project_name}.bak"
             MIRROR_DIR="$MAIN_BACKUP_DIR/$project_name"
         fi
-        
+
         # Check if mirror actually exists
         if [[ -d "$MIRROR_DIR" ]]; then
             HAS_MIRROR=true
         fi
     fi
-    
+
     # --- Mirror Reduction Stats Summary ---
-    
+
     declare -A files_source files_mirror lines_source lines_mirror
-    
+
     # Count files and lines using find (not git) for consistency with backup behavior
     count_files_by_pattern() {
         local dir="$1"
         local pattern="$2"
         find "$dir" -type f -name "$pattern" 2>/dev/null | wc -l
     }
-    
+
     count_lines_by_pattern() {
         local dir="$1"
         local pattern="$2"
@@ -60,7 +60,7 @@ show_console_summary() {
       lines_source[$ext]=$(count_lines_by_pattern "$SOURCE_DIR" "*.${ext}")
       files_source[$ext]=${files_source[$ext]:-0}
       lines_source[$ext]=${lines_source[$ext]:-0}
-      
+
       if [[ "$HAS_MIRROR" == "true" ]]; then
           files_mirror[$ext]=$(count_files_by_pattern "$MIRROR_DIR" "*.${ext}")
           lines_mirror[$ext]=$(count_lines_by_pattern "$MIRROR_DIR" "*.${ext}")
@@ -71,7 +71,7 @@ show_console_summary() {
           lines_mirror[$ext]=0
       fi
     done
-    
+
     total_files() {
       find "$1" -type f 2>/dev/null | wc -l
     }
@@ -87,11 +87,11 @@ show_console_summary() {
     total_size() {
       du -sm "$1" | awk '{print $1}'
     }
-    
+
     total_files_source=$(total_files "$SOURCE_DIR")
     size_source=$(total_size "$SOURCE_DIR")
     total_lines_source=$(total_lines "$SOURCE_DIR")
-    
+
     if [[ "$HAS_MIRROR" == "true" ]]; then
         total_files_mirror=$(total_files "$MIRROR_DIR")
         total_lines_mirror=$(total_lines "$MIRROR_DIR")
@@ -107,7 +107,7 @@ show_console_summary() {
         delta_lines=0
         delta_size=0
     fi
-    
+
     percent() {
       local orig="$1"
       local new="$2"
@@ -117,11 +117,11 @@ show_console_summary() {
       else
         pct=$(awk "BEGIN {printf \"%.1f%%\", ($orig-$new)*100/$orig}")
       fi
-    
+
       local pad="        "
       local padded="${pad}${pct}"
       padded="${padded: -8}"
-    
+
       local color_reset="\033[0m"
       local color=""
       if [[ "$pct" =~ ^[0-9]+(\.[0-9]+)?%$ ]]; then
@@ -136,7 +136,7 @@ show_console_summary() {
         printf "%s" "$padded"
       fi
     }
-    
+
     echo
     if [[ "$HAS_MIRROR" == "true" ]]; then
         echo "Mirror Reduction Stats"
@@ -149,20 +149,20 @@ show_console_summary() {
         printf "%-18s %10s\n" "Metric" "Count"
         printf "%-18s %10s\n" "-----"  "-----"
     fi
-    
+
     if [[ "$HAS_MIRROR" == "true" ]]; then
         printf "%-18s %10s %10s %10s %8b\n" "Total files" "$total_files_source" "$total_files_mirror" "$delta_files" "$(percent "$total_files_source" "$total_files_mirror")"
         for ext in "${EXTENSIONS[@]}"; do
           delta=$((files_source[$ext] - files_mirror[$ext]))
           printf "%-18s %10s %10s %10s %8b\n" ".${ext} files" "${files_source[$ext]}" "${files_mirror[$ext]}" "$delta" "$(percent "${files_source[$ext]}" "${files_mirror[$ext]}")"
         done
-        
+
         printf "%-18s %10s %10s %10s %8b\n" "Total lines" "$total_lines_source" "$total_lines_mirror" "$delta_lines" "$(percent "$total_lines_source" "$total_lines_mirror")"
         for ext in "${EXTENSIONS[@]}"; do
           delta=$((lines_source[$ext] - lines_mirror[$ext]))
           printf "%-18s %10s %10s %10s %8b\n" ".${ext} lines" "${lines_source[$ext]}" "${lines_mirror[$ext]}" "$delta" "$(percent "${lines_source[$ext]}" "${lines_mirror[$ext]}")"
         done
-        
+
         printf "%-18s %10s %10s %10s %8b\n" "Total size (MB)" "$size_source" "$size_mirror" "$delta_size" "$(percent "$size_source" "$size_mirror")"
     else
         printf "%-18s %10s\n" "Total files" "$total_files_source"
@@ -171,23 +171,23 @@ show_console_summary() {
             printf "%-18s %10s\n" ".${ext} files" "${files_source[$ext]}"
           fi
         done
-        
+
         printf "%-18s %10s\n" "Total lines" "$total_lines_source"
         for ext in "${EXTENSIONS[@]}"; do
           if [[ "${lines_source[$ext]}" -gt 0 ]]; then
             printf "%-18s %10s\n" ".${ext} lines" "${lines_source[$ext]}"
           fi
         done
-        
+
         printf "%-18s %10s\n" "Total size (MB)" "$size_source"
     fi
-    
+
     if [[ "$HAS_MIRROR" == "true" ]]; then
         echo "----------------------"
     else
         echo "------------------"
     fi
-    
+
     if [[ "$HAS_MIRROR" == "true" ]]; then
         mirror_chars=$(find "$MIRROR_DIR" -type f -exec cat {} + | wc -c)
         token_estimate=$((mirror_chars / 4))
@@ -197,7 +197,7 @@ show_console_summary() {
         token_estimate=$((source_chars / 4))
         printf "Source token estimate: %s (~4 chars per token)\n" "$token_estimate"
     fi
-    
+
     commit_count=$(git -C "$SOURCE_DIR" rev-list --count HEAD 2>/dev/null || echo "N/A")
     git_log=$(git -C "$SOURCE_DIR" log -1 --format='%cd|%h|%s' --date=format:'%Y-%m-%d:%H:%M' 2>/dev/null)
     if [[ -n "$git_log" ]]; then
@@ -211,7 +211,7 @@ show_console_summary() {
     else
       latest_commit="N/A"
     fi
-    
+
     printf "git: [ commits: %s ][ latest: %s ]\n" "$commit_count" "$latest_commit"
     echo "tip: ilma console (this display) | ilma --help"
 }
@@ -222,12 +222,12 @@ show_backup_stats() {
     local mirror_dir="$2"
     local project_name
     project_name="$(basename "$project_root")"
-    
+
     # Only show stats in configured mode
     if [[ "$CONFIG_FOUND" == "true" ]]; then
         SOURCE_DIR="$project_root"
         MIRROR_DIR="$mirror_dir"
-        
+
         # Use the same stats logic as console summary
         show_console_summary "$project_root"
     fi
@@ -237,11 +237,11 @@ show_backup_stats() {
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     # This would be the analyze/console command entry point
     PROJECT_ROOT="${1:-$(pwd)}"
-    
+
     # Load configuration first
     source "$ILMA_DIR/lib/config.sh"
     load_config "$PROJECT_ROOT"
-    
+
     # Show console summary
     show_console_summary "$PROJECT_ROOT"
 fi

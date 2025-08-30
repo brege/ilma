@@ -179,7 +179,7 @@ for proj_dir in "${project_dirs[@]}"; do
             echo "  No junk files found."
         fi
     fi
-    
+
     if [[ "$PRETTY_OUTPUT" == "true" ]]; then
         echo
     fi

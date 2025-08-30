@@ -21,7 +21,7 @@ git-count-lines() {
     for file in "$@"; do
       [[ -f "$file" ]] && existing_files+=("$file")
     done
-    
+
     if [[ ${#existing_files[@]} -gt 0 ]]; then
       awk '{s+=$1} END {print s}' <<<"$(xargs -d '\n' wc -l < <(printf '%s\n' "${existing_files[@]}"))"
     else

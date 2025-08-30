@@ -5,7 +5,7 @@
 load_config() {
     local project_root="$1"
     local type="${2:-}"
-    
+
     # Set default configuration variables
     BACKUP_BASE_DIR="."
     ARCHIVE_BASE_DIR=""
@@ -18,13 +18,13 @@ load_config() {
     RSYNC_EXCLUDES=()
     CONTEXT_FILES=()
     TREE_EXCLUDES=""
-    
+
     # Load default config first
     ILMA_DIR="$(dirname "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")")"
     if [[ -f "$ILMA_DIR/configs/default.conf" ]]; then
         source "$ILMA_DIR/configs/default.conf"
     fi
-    
+
     # Load type-specific config if specified (for archive creation only)
     TYPE_CONFIG_LOADED=false
     if [[ -n "$type" ]]; then
@@ -39,7 +39,7 @@ load_config() {
             echo "Warning: Configuration type '$type' not found, using defaults" >&2
         fi
     fi
-    
+
     # Load project-local configuration (enables full pipeline)
     CONFIG_FOUND=false
     for config_file in ".ilma.conf" ".archive.conf" ".backup.conf"; do
@@ -55,7 +55,7 @@ load_config() {
 handle_special_modes() {
     local archive_flag="$1"
     local project_root="$2"
-    
+
     if [[ -n "$archive_flag" ]]; then
         # --archive mode: force archive creation
         RSYNC_EXCLUDES=()  # No exclusions - archive everything
@@ -72,7 +72,7 @@ handle_special_modes() {
             # SAFETY: Always exclude critical directories even in fallback mode
             RSYNC_EXCLUDES=(
                 --exclude '.git/'
-                --exclude '.svn/' 
+                --exclude '.svn/'
                 --exclude '.hg/'
                 --exclude '.bzr/'
                 --exclude '*.tar.zst'
@@ -85,7 +85,7 @@ handle_special_modes() {
         ARCHIVE_BASE_DIR="$(dirname "$(realpath "$project_root")")"
         BACKUP_XDG_DIRS=false
         CONTEXT_BASE_DIR=""  # No context mirror in fallback mode
-        
+
         if [[ "$TYPE_CONFIG_LOADED" == "true" ]]; then
             echo "Type configuration loaded - creating archive in current directory"
         else
@@ -97,7 +97,7 @@ handle_special_modes() {
 # Show configuration (--config command)
 show_config() {
     local project_root="$1"
-    
+
     echo "Project: $project_root"
     echo "Config found: ${CONFIG_FOUND}"
     echo
@@ -130,7 +130,7 @@ show_config() {
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     PROJECT_ROOT="${1:-$(pwd)}"
     TYPE="${2:-}"
-    
+
     load_config "$PROJECT_ROOT" "$TYPE"
     show_config "$PROJECT_ROOT"
 fi
