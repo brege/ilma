@@ -5,6 +5,43 @@
 ILMA_DIR="$(dirname "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")")"
 source "$ILMA_DIR/lib/functions.sh"
 
+usage() {
+    cat <<EOF
+Usage: ilma console [PROJECT_PATH]
+
+Display project statistics and mirror reduction analysis.
+
+ARGUMENTS:
+  PROJECT_PATH     Path to project directory (default: current directory)
+
+OPTIONS:
+  -h, --help       Show this help message
+
+DESCRIPTION:
+  Shows detailed statistics about your project including:
+  - File counts by type (.py, .md, .json, etc.)
+  - Line counts and size analysis
+  - Mirror reduction metrics (if backup exists)
+  - Git repository information (commits, latest commit)
+  - Token estimation for LLM context planning
+
+  The console view helps evaluate the impact of including your project
+  in an LLM's context window by showing size and complexity metrics.
+
+EXAMPLES:
+  ilma console                    # Show stats for current directory
+  ilma console ~/my-project       # Show stats for specific project
+
+NOTES:
+  - Statistics reflect actual files, not git-tracked files
+  - Mirror reduction shows comparison with existing ilma backup
+  - Token estimation assumes ~4 characters per token
+  - Git info shown only if project is a git repository
+
+EOF
+    exit 0
+}
+
 # Show console summary (stats only, no backup)
 show_console_summary() {
     local project_root="$1"

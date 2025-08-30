@@ -154,7 +154,7 @@ generate_tree_and_context() {
 # Date generated: $TREE_DATE
 # $LATEST_COMMIT
 
-~/build/
+$BACKUP_BASE_DIR/
 ├── $project_name/
 │   └── ... (The user's actual, complete project workspace)
 │

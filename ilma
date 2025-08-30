@@ -5,8 +5,21 @@ set -euo pipefail
 ILMA_DIR="$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")"
 TOOL_ROOT="$(dirname "$ILMA_DIR")"
 
-# Handle help and version
-if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
+# Handle help and version - check for help early before any path resolution
+HELP_REQUESTED=false
+HELP_COMMAND=""
+
+# Early scan for help flags and commands
+for arg in "$@"; do
+    if [[ "$arg" == "--help" || "$arg" == "-h" ]]; then
+        HELP_REQUESTED=true
+    elif [[ "$arg" =~ ^(backup|console|scan|prune|config)$ ]]; then
+        HELP_COMMAND="$arg"
+    fi
+done
+
+# Handle main help (no subcommand specified)
+if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]] && [[ -z "$HELP_COMMAND" ]]; then
     cat <<EOF
 Usage: ilma [COMMAND] [OPTIONS] [PROJECT_PATH]
 
@@ -27,11 +40,11 @@ OPTIONS:
   -h, --help                           Show this help
 
 PROJECT TYPES:
-  default, minimal, latex, node, python
+  default, minimal, bash, latex, node, python
 
 EXAMPLES:
   ilma                                 Backup current directory
-  ilma ~/build/project                 Backup specific project
+  ilma ~/my-project                    Backup specific project
   ilma --type latex                    Backup, ignoring common LaTeX cruft
   ilma --archive project archive/      Archive project to a specific directory
   ilma console                         Show project statistics
@@ -47,6 +60,42 @@ CONFIGURATION:
  ● Consider adding .ilma.conf to ~/.config/git/ignore.
 EOF
     exit 0
+fi
+
+# Handle subcommand help early
+if [[ "$HELP_REQUESTED" == "true" && -n "$HELP_COMMAND" ]]; then
+    case "$HELP_COMMAND" in
+        scan)
+            "$ILMA_DIR/lib/scan.sh" --help
+            exit 0
+            ;;
+        prune)
+            source "$ILMA_DIR/lib/prune.sh"
+            usage
+            exit 0
+            ;;
+        console)
+            source "$ILMA_DIR/lib/console.sh"
+            usage
+            exit 0
+            ;;
+        config)
+            source "$ILMA_DIR/lib/config.sh"
+            usage
+            exit 0
+            ;;
+        backup)
+            cat <<EOF
+Usage: ilma backup [OPTIONS] [PROJECT_PATH]
+
+Create backup and context mirror of a project (default command).
+
+This is the same as running 'ilma' without any command.
+For full help, run: ilma --help
+EOF
+            exit 0
+            ;;
+    esac
 fi
 
 # Parse arguments to determine command and options
@@ -118,6 +167,10 @@ while (( $# > 0 )); do
             ;;
         backup|console|scan|prune|config)
             # Skip command names
+            shift
+            ;;
+        --help|-h)
+            # Skip help flags (handled earlier)
             shift
             ;;
         *)

@@ -1,4 +1,4 @@
-# ilma
+# `ilma`
 
 A project-aware backup and archival tool that creates context mirrors with statistics for LLM consumption.
 
@@ -24,23 +24,50 @@ Most systems have these tools pre-installed. On minimal systems, you may need to
 
 ## Installation
 
-1. Add `~/build/ilma` to your PATH
-2. Add `.ilma.conf` to your global git excludes: `echo ".ilma.conf" >> ~/.config/git/ignore`
+``` bash
+git clone https://github.com/brege/ilma
+cd ilma
+```
+
+1. Add `ilma` to your PATH
+2. (Optional) Add `.ilma.conf` to your global git excludes: `echo ".ilma.conf" >> ~/.config/git/ignore`
 3. Create project-specific configuration files as needed
 
 ## Usage
 
-```bash
-# Backup current directory
+``` bash
+# Backup current directory (default behavior)
 ilma
 
 # Backup specific project
 ilma /path/to/project
 
-# Show stats only (no backup)
-ilma -c
-ilma /path/to/project -c
+# Show project statistics (no backup)
+ilma console
+ilma console /path/to/project
+
+# Scan for junk files (all paths marked as artifacts)
+ilma scan --type python --pretty
+
+# Junk file pruning workflow
+ilma prune --verbose                 # Preview what would be deleted
+ilma prune --type latex --bak        # Backup then clean LaTeX project
+ilma prune --type python --delete    # Delete junk files (no backup)
+
+# Show configuration
+ilma config
+ilma config /path/to/project
 ```
+
+### Commands
+
+**`ilma [backup]`** - Create backup and context mirror (default command)
+**`ilma console`**  - Show project statistics and analysis  
+**`ilma scan`**     - Scan for junk files based on project type
+**`ilma prune`**    - Analyze and optionally remove junk files
+**`ilma config`**   - Display current configuration settings
+
+Use `ilma COMMAND --help` for detailed help on each command.
 
 ### Console
 
@@ -67,13 +94,13 @@ ilma /path/to/project -c
   git: [ commits: 9 ][ latest: 2025-08-29:16:42 (64ebf25) docs: update README.md ]
   tip: ilma console (this display) | ilma --help
 ```
-This overview is useful for quickly evaluating the impact your source code might have in an LLM's context window.
+This overview is useful for quickly evaluating the impact your source code might have on an LLM's context window.
 
-Using `ilma` from your project root will automatically create a minimal snapshot of your project in the same parent directory as the project itself. An `.ilma.conf` in the source root allows finer control over replaceable assets to duplicate.
+Using **`ilma`** from your project root will automatically create a minimal snapshot of your project in the same parent directory as the project itself. An `.ilma.conf` in the source root allows finer control over replaceable assets to duplicate.
 
 ## Default Configuration
 
-By default, ilma uses minimal exclusions and tracks basic file types:
+By default, **`ilma`** uses minimal exclusions and tracks basic file types:
 
 ### Default Exclusions
 - `.git/` - Git repository data
@@ -87,7 +114,7 @@ By default, ilma uses minimal exclusions and tracks basic file types:
 - `txt` - Text files
 
 ### Default Backup Location
-- `~/build/` - Working backups stored here
+- Current directory (`.`) - Working backups stored here by default
 - No compressed archives by default
 - No XDG directory backup by default
 
@@ -121,7 +148,7 @@ TREE_EXCLUDES+="|node_modules|dist"
 ## Configuration Options
 
 ### Backup Locations
-- `BACKUP_BASE_DIR` - Where working backups are stored (default: `$HOME/build`)
+- `BACKUP_BASE_DIR` - Where working backups are stored (default: current directory)
 - `ARCHIVE_BASE_DIR` - Where compressed archives are stored (empty = disabled)
 - `CONTEXT_BASE_DIR` - Where context mirrors are stored (empty = nested in backup)
 - `CREATE_COMPRESSED_ARCHIVE` - Create timestamped .tar.zst files (default: false)
@@ -139,22 +166,16 @@ TREE_EXCLUDES+="|node_modules|dist"
 
 ## Example Configurations
 
-### Node.js Project
-```bash
-# .ilma.conf
-EXTENSIONS=(js ts md json yaml)
-BACKUP_XDG_DIRS=false
+See [`configs/`](./configs) for example configuration files.
 
-RSYNC_EXCLUDES+=(
-    --exclude 'node_modules/'
-    --exclude 'package-lock.json'
-    --exclude 'dist/'
-    --exclude 'build/'
-    --exclude '.next/'
-    --exclude 'coverage/'
-)
-
-TREE_EXCLUDES+="|node_modules|dist|build"
+``` 
+configs/
+├── bash-project.ilma.conf    ✔ sh,bash,conf ..    ✖ log,tmp ..
+├── default.conf              ✔ md,txt ..          ✖ .git,.ilma.conf ..
+├── latex-project.ilma.conf   ✔ tex,bbl ..         ✖ .aux,.log,.synctex.gz ..
+├── minimal.ilma.conf         ✔ md,txt ..
+├── node-project.ilma.conf    ✔ js,ts,md,json ..   ✖ node_modules,package-lock.json ..
+└── python-project.ilma.conf  ✔ py,md,yaml ..      ✖ .pyc,__pycache__,venv ..
 ```
 
 ### Python Project
@@ -180,50 +201,10 @@ RSYNC_EXCLUDES+=(
 TREE_EXCLUDES+="|__pycache__|venv|.venv|dist|build"
 ```
 
-### LaTeX Project
-```bash
-# .ilma.conf
-EXTENSIONS=(tex md txt bib)
-BACKUP_XDG_DIRS=false
-
-RSYNC_EXCLUDES+=(
-    --exclude '*.aux'
-    --exclude '*.log'
-    --exclude '*.out'
-    --exclude '*.toc'
-    --exclude '*.lof'
-    --exclude '*.lot'
-    --exclude '*.fdb_latexmk'
-    --exclude '*.fls'
-    --exclude '*.synctex.gz'
-    --exclude '*.blg'
-    --exclude '*.run.xml'
-    --exclude '*.bcf'
-    --exclude '_minted-*/'
-)
-
-CONTEXT_FILES=(
-    "README.md"
-    "*.pdf"
-)
-
-TREE_EXCLUDES+="|_minted-*"
-```
-
 ## ABC Architecture
 
-**`ilma`** implements an Archive-Backup-Context pattern:
+**`ilma`** optionally provides an Archive-Backup-Context pattern.  The behavior is controlled by the `.ilma.conf` file in the project root.
 
-### Default Structure (nested)
-```
-~/build/
-├── project.bak/               # Full backup
-│   ├── ...                    # Complete 1:1 copy
-│   └── project/               # Context mirror (LLM-ready)
-└── project-timestamp.tar.zst  # Optional compressed archive
-```
-
-### Separated Structure (with CONTEXT_BASE_DIR)
 ```
 ../
 ├── archive/project-timestamp.tar.zst  # Compressed archives
@@ -231,6 +212,30 @@ TREE_EXCLUDES+="|_minted-*"
 └── context/project/                   # Context mirrors
 ```
 
+You can make use of **`ilma`**'s configuration to intelligently clean up build artifacts and other junk files.
+Run with `ilma prune --bak my-project` to create a complete snapshot of your project, while removing junk files.
+
+``` bash
+my-projects$ ilma prune dissertation/ --type latex  # [options] 
+# options: --verbose, --bak, --delete
+```
+
+``` text
+Directory: /home/me/my-projects/dissertation
+Type: latex
+
+Found 22 junk items
+
+Preview (first 5 items):
+  one-gamma-vs-density.aux
+  31-dissertation-defense.aux
+  ejecta.aux
+  initial-data.aux
+  matter.aux
+  ... and 17 more items
+
+Use --verbose to see detailed analysis
+```
 
 ## License
 [GPLv3](https://www.gnu.org/licenses/gpl-3.0.txt)
