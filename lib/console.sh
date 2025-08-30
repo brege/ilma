@@ -36,15 +36,34 @@ show_console_summary() {
     
     declare -A files_source files_mirror lines_source lines_mirror
     
+    # Count files and lines using find (not git) for consistency with backup behavior
+    count_files_by_pattern() {
+        local dir="$1"
+        local pattern="$2"
+        find "$dir" -type f -name "$pattern" 2>/dev/null | wc -l
+    }
+    
+    count_lines_by_pattern() {
+        local dir="$1"
+        local pattern="$2"
+        local files=()
+        mapfile -t files < <(find "$dir" -type f -name "$pattern" 2>/dev/null)
+        if [[ ${#files[@]} -gt 0 ]]; then
+            wc -l "${files[@]}" 2>/dev/null | tail -n1 | awk '{print $1}'
+        else
+            echo 0
+        fi
+    }
+
     for ext in "${EXTENSIONS[@]}"; do
-      files_source[$ext]=$(git-count-files "$SOURCE_DIR" "*.${ext}" | awk -v e="*.${ext}:" '$1==e {print $2}')
-      lines_source[$ext]=$(git-count-lines "$SOURCE_DIR" "*.${ext}" | awk -v e="*.${ext}:" '$1==e {print $(NF-1)}')
+      files_source[$ext]=$(count_files_by_pattern "$SOURCE_DIR" "*.${ext}")
+      lines_source[$ext]=$(count_lines_by_pattern "$SOURCE_DIR" "*.${ext}")
       files_source[$ext]=${files_source[$ext]:-0}
       lines_source[$ext]=${lines_source[$ext]:-0}
       
       if [[ "$HAS_MIRROR" == "true" ]]; then
-          files_mirror[$ext]=$(git-count-files "$MIRROR_DIR" "*.${ext}" | awk -v e="*.${ext}:" '$1==e {print $2}')
-          lines_mirror[$ext]=$(git-count-lines "$MIRROR_DIR" "*.${ext}" | awk -v e="*.${ext}:" '$1==e {print $(NF-1)}')
+          files_mirror[$ext]=$(count_files_by_pattern "$MIRROR_DIR" "*.${ext}")
+          lines_mirror[$ext]=$(count_lines_by_pattern "$MIRROR_DIR" "*.${ext}")
           files_mirror[$ext]=${files_mirror[$ext]:-0}
           lines_mirror[$ext]=${lines_mirror[$ext]:-0}
       else
@@ -54,10 +73,16 @@ show_console_summary() {
     done
     
     total_files() {
-      git-count-files "$1" | awk '{sum+=$2} END {print sum}'
+      find "$1" -type f 2>/dev/null | wc -l
     }
     total_lines() {
-      git-count-lines "$1" | awk '/files/ {sum+=$(NF-1)} END {print sum}'
+      local files=()
+      mapfile -t files < <(find "$1" -type f 2>/dev/null)
+      if [[ ${#files[@]} -gt 0 ]]; then
+        wc -l "${files[@]}" 2>/dev/null | tail -n1 | awk '{print $1}'
+      else
+        echo 0
+      fi
     }
     total_size() {
       du -sm "$1" | awk '{print $1}'

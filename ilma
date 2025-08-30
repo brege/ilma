@@ -12,7 +12,7 @@ Usage: ilma [COMMAND] [OPTIONS] [PROJECT_PATH]
 
 COMMANDS:
   backup                               Create backup and context mirror (default)
-  analyze, console                     Show project statistics  
+  console                              Show project statistics
   scan                                 Scan project files and detect junk
   prune                                Dry-run analysis of files to clean (no deletion)
   config                               Show configuration details
@@ -20,8 +20,8 @@ COMMANDS:
 OPTIONS:
   --archive PROJECT_PATH ARCHIVE_PATH  Create archive at specific location
   --type TYPE                          Use project type configuration
+  --pretty                             Show detailed output (for scan command)
   --verbose                            Show detailed output (for prune command)
-  --stats                              Show statistics (for scan command)
   -h, --help                           Show this help
 
 PROJECT TYPES:
@@ -32,8 +32,8 @@ EXAMPLES:
   ilma ~/build/project                 Backup specific project
   ilma --type latex                    Backup, ignoring common LaTeX cruft
   ilma --archive project archive/      Archive project to a specific directory
-  ilma analyze                         Show project statistics
-  ilma scan --type python             Scan Python project for files and junk
+  ilma console                         Show project statistics
+  ilma scan --type python --pretty     Scan Python project with detailed output
   ilma prune --type latex --verbose    Analyze LaTeX project cruft (dry-run only)
   ilma config                          Show effective configuration
 
@@ -52,13 +52,13 @@ ARCHIVE_FLAG=""
 CONFIG_FLAG=""
 PROJECT_ROOT=""
 VERBOSE_FLAG=""
-STATS_FLAG=""
+PRETTY_FLAG=""
 
 # First pass - scan all arguments to identify command
 COMMAND="backup"  # Default command
 for arg in "$@"; do
     case "$arg" in
-        backup|analyze|console|scan|prune|config)
+        backup|console|scan|prune|config)
             COMMAND="$arg"
             break
             ;;
@@ -98,11 +98,11 @@ while (( $# > 0 )); do
             VERBOSE_FLAG="true"
             shift
             ;;
-        --stats)
-            STATS_FLAG="true"
+        --pretty)
+            PRETTY_FLAG="true"
             shift
             ;;
-        backup|analyze|console|scan|prune|config)
+        backup|console|scan|prune|config)
             # Skip command names
             shift
             ;;
@@ -161,17 +161,23 @@ case "$COMMAND" in
             show_backup_stats "$PROJECT_ROOT" "$MIRROR_DIR"
         fi
         ;;
-    console|analyze)
+    console)
         source "$ILMA_DIR/lib/console.sh"
         show_console_summary "$PROJECT_ROOT"
         ;;
     scan)
         # Load config without special mode handling for scan
-        source "$ILMA_DIR/lib/config.sh"
+        source "$ILMA_DIR/lib/config.sh" 
         load_config "$PROJECT_ROOT" "$TYPE"
-        # Don't call handle_special_modes for scan command
-        source "$ILMA_DIR/lib/scan.sh"
-        do_scan "$PROJECT_ROOT" "${STATS_FLAG:-false}"
+        
+        # Build arguments for scan.sh
+        scan_args=()
+        [[ -n "$TYPE" ]] && scan_args+=(--type "$TYPE")
+        [[ "$PRETTY_FLAG" == "true" ]] && scan_args+=(--pretty)
+        scan_args+=("$PROJECT_ROOT")
+        
+        # Call scan.sh directly
+        "$ILMA_DIR/lib/scan.sh" "${scan_args[@]}"
         ;;
     prune)
         # Load config without special mode handling for prune
@@ -179,7 +185,7 @@ case "$COMMAND" in
         load_config "$PROJECT_ROOT" "$TYPE"
         # Don't call handle_special_modes for prune command
         source "$ILMA_DIR/lib/prune.sh"
-        do_prune "$PROJECT_ROOT" "${VERBOSE_FLAG:-false}"
+        do_prune "$PROJECT_ROOT" "${VERBOSE_FLAG:-false}" "$TYPE"
         ;;
     config)
         show_config "$PROJECT_ROOT"
