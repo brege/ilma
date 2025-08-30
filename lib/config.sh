@@ -94,6 +94,42 @@ handle_special_modes() {
     fi
 }
 
+usage() {
+    cat <<EOF
+Usage: ilma config [PROJECT_PATH]
+
+Display current configuration settings and resolved paths.
+
+ARGUMENTS:
+  PROJECT_PATH     Path to project directory (default: current directory)
+
+OPTIONS:
+  -h, --help       Show this help message
+
+DESCRIPTION:
+  Shows the effective configuration for a project, including:
+  - Whether a local .ilma.conf file was found
+  - Resolved backup, archive, and context directory paths
+  - Archive creation settings and limits
+  - File extensions being tracked
+  - XDG directory backup settings
+
+  This is useful for troubleshooting configuration issues and
+  understanding which settings will be applied during backup operations.
+
+EXAMPLES:
+  ilma config                     # Show config for current directory
+  ilma config ~/my-project        # Show config for specific project
+
+NOTES:
+  - Configuration hierarchy: CLI flags > ~/.config/oshea/config.yaml > defaults
+  - Local .ilma.conf files override global settings
+  - Use this to verify your configuration before running backups
+
+EOF
+    exit 0
+}
+
 # Show configuration (--config command)
 show_config() {
     local project_root="$1"
