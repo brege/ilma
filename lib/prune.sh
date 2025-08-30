@@ -10,7 +10,7 @@ do_prune() {
     local delete_mode="${4:-false}"
     local project_name
     project_name="$(basename "$project_root")"
-    
+
     echo "Prune analysis for: $project_name"
     echo "Directory: $project_root"
     echo "Type: $type"
@@ -20,7 +20,7 @@ do_prune() {
         echo "DRY RUN ONLY - No files will be deleted"
     fi
     echo
-    
+
     if [[ "$verbose" == "true" ]]; then
         "$ILMA_DIR/lib/scan.sh" --type "$type" --pretty "$project_root"
     else
@@ -29,7 +29,7 @@ do_prune() {
             echo "No junk files found - project appears clean!"
             return 0
         fi
-        
+
         echo "Found ${#files[@]} junk items"
         echo
         echo "Preview (first 5 items):"
@@ -42,13 +42,13 @@ do_prune() {
         echo
         echo "Use --verbose to see detailed analysis"
     fi
-    
+
     if [[ "$delete_mode" == "true" ]]; then
         echo
         echo "PERFORMING ACTUAL DELETION"
         echo "This is NOT a dry run - files will be permanently deleted"
         echo
-        
+
         "$ILMA_DIR/lib/scan.sh" --type "$type" "$project_root" | while read -r file; do
             rm -rf "$file" && echo "DELETED: $file" || echo "FAILED: $file"
         done

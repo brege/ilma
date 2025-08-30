@@ -18,28 +18,28 @@ for conf in "$@"; do
         echo "Warning: Config file '$conf' not found, skipping."
         continue
     fi
-    
+
     # Extract RSYNC_EXCLUDES array lines
     # We want to grab patterns inside --exclude 'PATTERN' or --exclude "PATTERN"
     # Respect possible mixed usage of quotes.
     # Example line: --exclude '*.aux'
-    
+
     # Use grep + sed or bash read to extract patterns
     while IFS= read -r line; do
         # Remove leading/trailing spaces
         line="${line#"${line%%[![:space:]]*}"}"
         line="${line%"${line##*[![:space:]]}"}"
-        
-        # Only lines starting with --exclude 
+
+        # Only lines starting with --exclude
         if [[ "$line" =~ ^--exclude[[:space:]]+(.+) ]]; then
             pattern="${BASH_REMATCH[1]}"
-            
+
             # Remove surrounding quotes if present
             pattern="${pattern#\'}"
             pattern="${pattern%\'}"
             pattern="${pattern#\"}"
             pattern="${pattern%\"}"
-            
+
             # Check if this pattern looks like a directory pattern (ends with / or contains *)
             if [[ "$pattern" == */ ]]; then
                 # Directory pattern, strip trailing slash for uniformity
