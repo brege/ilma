@@ -13,7 +13,7 @@ HELP_COMMAND=""
 for arg in "$@"; do
     if [[ "$arg" == "--help" || "$arg" == "-h" ]]; then
         HELP_REQUESTED=true
-    elif [[ "$arg" =~ ^(backup|console|scan|prune|config)$ ]]; then
+    elif [[ "$arg" =~ ^(backup|console|scan|prune|config|decrypt|extract)$ ]]; then
         HELP_COMMAND="$arg"
     fi
 done
@@ -29,6 +29,8 @@ COMMANDS:
   scan                                 Scan project files and detect junk
   prune                                Dry-run analysis of files to clean (no deletion)
   config                               Show configuration details
+  decrypt                              Decrypt GPG-encrypted archive
+  extract                              Safely extract archive (prevents tarbombs)
 
 OPTIONS:
   --archive PROJECT_PATH ARCHIVE_PATH  Create archive at specific location
@@ -53,6 +55,8 @@ EXAMPLES:
   ilma prune --type python --bak       Backup Python project then delete junk
   ilma prune --type latex --delete     Delete LaTeX project junk (no backup)
   ilma config                          Show effective configuration
+  ilma decrypt file.tar.zst.gpg        Decrypt and extract GPG-encrypted archive
+  ilma extract archive.tar.zst         Safely extract archive to contained directory
 
 CONFIGURATION:
  ● Create .ilma.conf in project root to customize behavior.
@@ -95,6 +99,21 @@ For full help, run: ilma --help
 EOF
             exit 0
             ;;
+        extract)
+            cat <<EOF
+Usage: ilma extract <archive_file>
+
+Safely extract archive to contained directory (prevents tarbombs).
+
+Creates a directory based on the archive name and extracts contents there.
+Supports all compression formats: .tar.zst, .tar.gz, .tar.bz2, .tar.xz, etc.
+
+Examples:
+  ilma extract project.tar.zst     # Extracts to project/
+  ilma extract backup.tar.gz       # Extracts to backup/
+EOF
+            exit 0
+            ;;
     esac
 fi
 
@@ -113,7 +132,7 @@ DELETE_FLAG=""
 COMMAND="backup"  # Default command
 for arg in "$@"; do
     case "$arg" in
-        backup|console|scan|prune|config)
+        backup|console|scan|prune|config|decrypt|extract)
             COMMAND="$arg"
             break
             ;;
@@ -165,7 +184,7 @@ while (( $# > 0 )); do
             DELETE_FLAG="true"
             shift
             ;;
-        backup|console|scan|prune|config)
+        backup|console|scan|prune|config|decrypt|extract)
             # Skip command names
             shift
             ;;
@@ -187,16 +206,19 @@ if [[ -z "$PROJECT_ROOT" ]]; then
     PROJECT_ROOT="$(pwd)"
 fi
 
-# Validate project directory
-if [[ ! -d "$PROJECT_ROOT" ]]; then
-    echo "Error: Directory does not exist: $PROJECT_ROOT"
-    exit 1
+# Validate project directory (except for decrypt/extract commands which expect a file)
+if [[ "$COMMAND" != "decrypt" && "$COMMAND" != "extract" ]]; then
+    if [[ ! -d "$PROJECT_ROOT" ]]; then
+        echo "Error: Directory does not exist: $PROJECT_ROOT"
+        exit 1
+    fi
 fi
 
 PROJECT_NAME="$(basename "$PROJECT_ROOT")"
 
-# Load configuration
+# Load configuration and compression library
 source "$ILMA_DIR/lib/config.sh"
+source "$ILMA_DIR/lib/compression.sh"
 load_config "$PROJECT_ROOT" "$TYPE"
 
 # Handle --config command early (before special modes)
@@ -268,9 +290,19 @@ case "$COMMAND" in
             PROJECT_NAME="$(basename "$PROJECT_ROOT")"
             PARENT_DIR="$(dirname "$PROJECT_ROOT")"
             TIMESTAMP="$(date '+%Y%m%d-%H%M%S')"
-            BACKUP_ARCHIVE="$PARENT_DIR/${PROJECT_NAME}.orig.tar.zst"
+            # Get archive extension based on compression type
+            ARCHIVE_EXT=$(get_archive_extension "$COMPRESSION_TYPE")
+            BACKUP_ARCHIVE="$PARENT_DIR/${PROJECT_NAME}.orig${ARCHIVE_EXT}"
 
-            if tar --zstd -cf "$BACKUP_ARCHIVE" -C "$PROJECT_ROOT" .; then
+            # Get tar option for compression
+            TAR_OPTION=$(get_tar_option "$COMPRESSION_TYPE")
+            if [[ -n "$TAR_OPTION" ]]; then
+                TAR_CMD="tar $TAR_OPTION -cf"
+            else
+                TAR_CMD="tar -cf"
+            fi
+
+            if $TAR_CMD "$BACKUP_ARCHIVE" -C "$PROJECT_ROOT" .; then
                 echo "Complete backup created: $BACKUP_ARCHIVE"
             else
                 echo "ERROR: Failed to create backup archive"
@@ -300,6 +332,84 @@ case "$COMMAND" in
         ;;
     config)
         show_config "$PROJECT_ROOT"
+        ;;
+    decrypt)
+        source "$ILMA_DIR/lib/gpg.sh"
+        if [[ -z "$PROJECT_ROOT" ]]; then
+            echo "Error: No input file specified for decryption"
+            exit 1
+        fi
+        
+        # Use PROJECT_ROOT as input file for decrypt command
+        input_file="$PROJECT_ROOT"
+        output_file="${input_file%.gpg}"
+        
+        if decrypt_file "$input_file" "$output_file"; then
+            if is_archive "$output_file"; then
+                extract_dir="./$(basename "${output_file%.*}")"
+                echo "Extracting to $extract_dir..."
+                if extract_archive "$output_file" "$extract_dir"; then
+                    echo "Decryption and extraction complete: $extract_dir"
+                else
+                    echo "Decryption successful, but extraction failed: $output_file"
+                fi
+            else
+                echo "Decryption complete: $output_file"
+            fi
+        fi
+        ;;
+    extract)
+        source "$ILMA_DIR/lib/compression.sh"
+        if [[ -z "$PROJECT_ROOT" ]]; then
+            echo "Error: No archive file specified for extraction"
+            exit 1
+        fi
+        
+        # Use PROJECT_ROOT as input archive file
+        archive_file="$PROJECT_ROOT"
+        
+        if [[ ! -f "$archive_file" ]]; then
+            echo "Error: Archive file does not exist: $archive_file"
+            exit 1
+        fi
+        
+        if ! is_archive "$archive_file"; then
+            echo "Error: File is not a recognized archive: $archive_file"
+            exit 1
+        fi
+        
+        # Create safe extraction directory based on archive name
+        archive_base="$(basename "$archive_file")"
+        # Remove all extensions (.tar.zst -> archive_base, .tar.gz -> archive_base, etc)
+        safe_dir="${archive_base%%.*}"
+        
+        if [[ -e "$safe_dir" ]]; then
+            echo "Error: Target directory already exists: $safe_dir"
+            exit 1
+        fi
+        
+        echo "Safely extracting $archive_file to $safe_dir/"
+        mkdir -p "$safe_dir"
+        
+        # Use compression library to determine extraction method
+        compression_type=$(get_compression_type_from_file "$archive_file")
+        tar_option=$(get_tar_option "$compression_type")
+        
+        if [[ -n "$tar_option" ]]; then
+            tar $tar_option -xf "$archive_file" -C "$safe_dir"
+        else
+            tar -xf "$archive_file" -C "$safe_dir"
+        fi
+        
+        if [[ $? -eq 0 ]]; then
+            echo "Archive extracted successfully to: $safe_dir/"
+            echo "Contents:"
+            ls -la "$safe_dir/"
+        else
+            echo "Extraction failed"
+            rmdir "$safe_dir" 2>/dev/null
+            exit 1
+        fi
         ;;
     *)
         echo "Error: Unknown command '$COMMAND'"
