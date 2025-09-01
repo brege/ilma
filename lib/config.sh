@@ -1,6 +1,47 @@
 #!/bin/bash
 # lib/config.sh - Configuration loading and management for ilma
 
+# Load INI configuration file
+load_ini_config() {
+    local ini_file="$1"
+    local section=""
+
+    while IFS= read -r line; do
+        # Skip comments and empty lines
+        [[ "$line" =~ ^[[:space:]]*# ]] && continue
+        [[ -z "$line" ]] && continue
+
+        # Section headers
+        if [[ "$line" =~ ^\[(.+)\]$ ]]; then
+            section="${BASH_REMATCH[1]}"
+            continue
+        fi
+
+        # Key-value pairs
+        if [[ "$line" =~ ^([^=]+)=(.*)$ ]]; then
+            local key="${BASH_REMATCH[1]// /}"
+            local value="${BASH_REMATCH[2]# }"
+
+            # Skip empty values (allows overriding with later non-empty values)
+            [[ -z "$value" ]] && continue
+
+            case "$section.$key" in
+                compression.type) COMPRESSION_TYPE="$value" ;;
+                compression.level) COMPRESSION_LEVEL="$value" ;;
+                backup.create_compressed_archive) CREATE_COMPRESSED_ARCHIVE="$value" ;;
+                backup.max_archives) MAX_ARCHIVES="$value" ;;
+                backup.backup_xdg_dirs) BACKUP_XDG_DIRS="$value" ;;
+                rsync.remote_server) REMOTE_SERVER="$value" ;;
+                rsync.remote_path) REMOTE_PATH="$value" ;;
+                rsync.cleanup_after_transfer) CLEANUP_AFTER_TRANSFER="$value" ;;
+                hash.algorithm) HASH_ALGORITHM="$value" ;;
+                gpg.key_id) GPG_KEY_ID="$value" ;;
+                gpg.output_extension) GPG_OUTPUT_EXTENSION="$value" ;;
+            esac
+        fi
+    done < "$ini_file"
+}
+
 # Load configuration with type support and fallback handling
 load_config() {
     local project_root="$1"
@@ -18,9 +59,22 @@ load_config() {
     RSYNC_EXCLUDES=()
     CONTEXT_FILES=()
     TREE_EXCLUDES=""
+    COMPRESSION_TYPE="zstd"
+    COMPRESSION_LEVEL="3"
+    REMOTE_SERVER=""
+    REMOTE_PATH=""
+    CLEANUP_AFTER_TRANSFER="false"
+    HASH_ALGORITHM="sha256"
+    GPG_KEY_ID=""
+    GPG_OUTPUT_EXTENSION=".gpg"
 
-    # Load default config first
+    # Load central config.ini first
     ILMA_DIR="$(dirname "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")")"
+    if [[ -f "$ILMA_DIR/config.ini" ]]; then
+        load_ini_config "$ILMA_DIR/config.ini"
+    fi
+
+    # Load legacy configs for backward compatibility
     if [[ -f "$ILMA_DIR/configs/default.conf" ]]; then
         source "$ILMA_DIR/configs/default.conf"
     fi
@@ -71,12 +125,10 @@ handle_special_modes() {
         if [[ "$TYPE_CONFIG_LOADED" == "false" ]]; then
             # SAFETY: Always exclude critical directories even in fallback mode
             RSYNC_EXCLUDES=(
-                --exclude '.git/'
                 --exclude '.svn/'
                 --exclude '.hg/'
                 --exclude '.bzr/'
-                --exclude '*.tar.zst'
-                --exclude '*.tar.gz'
+                --exclude '*.tar.*'
                 --exclude '*.tar'
             )
         fi

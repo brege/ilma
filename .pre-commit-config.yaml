@@ -1,0 +1,11 @@
+- repo: https://github.com/mvdan/sh
+  rev: v3.7.0  # check for latest
+  hooks:
+    - id: shfmt
+      args: ["-i", "2", "-ci", "-w"]
+
+- repo: https://github.com/koalaman/shellcheck
+  rev: v0.9.0
+  hooks:
+    - id: shellcheck
+

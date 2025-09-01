@@ -1,18 +1,11 @@
 # ShellCheck configuration for ilma project
-# Focus on practical checks while allowing legitimate bash patterns
 
-# Disable overly strict rules that don't apply to config-driven projects
-disable=SC1091  # Not following sourced files (we use dynamic config loading)
-disable=SC1090  # Can't follow non-constant source (legitimate for .ilma.conf, type configs)
-disable=SC2034  # Variable unused (many are exported/config variables used externally)
-disable=SC2086  # Double quote to prevent globbing (legitimate for find expressions like PRUNE_EXPR)
+# Allow dynamic sourcing, config files, and unused exports
+disable=SC1090  # non-constant source
+disable=SC1091  # can't follow sourced files
+disable=SC2034  # unused vars (used via export or externally)
 
-# Allow external sources when possible for better analysis
-external-sources=true
+# Allow intentional unquoted expansions and $? checks
+disable=SC2086  # unquoted expansion (e.g. find PRUNE_EXPR)
+disable=SC2181  # checking $? instead of inlining commands
 
-# Keep all other checks enabled for:
-# - Syntax errors and dangerous patterns
-# - Consistency and style issues  
-# - Real unused variables (not config/exported ones)
-# - Proper quoting and word splitting issues
-# - Array handling best practices

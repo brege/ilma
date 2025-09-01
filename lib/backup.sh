@@ -4,6 +4,9 @@
 # Source required functions
 ILMA_DIR="$(dirname "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")")"
 source "$ILMA_DIR/lib/functions.sh"
+source "$ILMA_DIR/lib/compression.sh"
+source "$ILMA_DIR/lib/rsync.sh"
+source "$ILMA_DIR/lib/gpg.sh"
 
 # Main backup function
 do_backup() {
@@ -106,7 +109,9 @@ do_backup() {
             fi
         fi
 
-        FINAL_EXCLUDES=("${RSYNC_EXCLUDES[@]}" "${DYNAMIC_EXCLUDES[@]}")
+        # Add .git exclusion only for context mirrors (protection from Claude Code 1000 file limit)
+        CONTEXT_EXCLUDES=("--exclude" ".git/")
+        FINAL_EXCLUDES=("${RSYNC_EXCLUDES[@]}" "${DYNAMIC_EXCLUDES[@]}" "${CONTEXT_EXCLUDES[@]}")
 
         rsync -av --delete \
             "${FINAL_EXCLUDES[@]}" \
@@ -115,6 +120,7 @@ do_backup() {
         echo
 
         # --- Step 3: Generate TREE.txt and Copy Context Files into the Mirror ---
+        source "$ILMA_DIR/hooks/tree.sh"
         generate_tree_and_context "$project_root" "$project_name" "$MIRROR_DIR"
 
         echo
@@ -124,61 +130,6 @@ do_backup() {
     fi
 }
 
-# Generate TREE.txt and copy context files
-generate_tree_and_context() {
-    local project_root="$1"
-    local project_name="$2"
-    local mirror_dir="$3"
-
-    TREE_OUT="$mirror_dir/TREE.txt"
-    echo "Step 3: Generating project tree and copying context files..."
-
-    # Gather datestamp and latest commit info
-    TREE_DATE="$(date -u +"%Y-%m-%d %H:%M UTC")"
-    GIT_LOG=$(git -C "$project_root" log -1 --format='%cd|%h|%an|%s' --date=format:'%Y-%m-%d %H:%M' 2>/dev/null)
-    if [[ -n "$GIT_LOG" ]]; then
-      IFS='|' read -r commit_date commit_hash commit_author commit_msg <<< "$GIT_LOG"
-      # Truncate commit message to 60 chars for clarity
-      maxlen=60
-      if (( ${#commit_msg} > maxlen )); then
-        commit_msg="${commit_msg:0:maxlen}.."
-      fi
-      LATEST_COMMIT="Latest commit: $commit_date ($commit_hash) by $commit_author
-        $commit_msg"
-    else
-      LATEST_COMMIT="Latest commit: N/A"
-    fi
-
-    cat > "$TREE_OUT" <<EOL
-# TREE.txt snapshot for Context Mirror
-# Date generated: $TREE_DATE
-# $LATEST_COMMIT
-
-$BACKUP_BASE_DIR/
-├── $project_name/
-│   └── ... (The user's actual, complete project workspace)
-│
-└── ${project_name}.bak/
-    ├── ... (A complete, 1:1 backup of the working directory)
-    │
-    └── $project_name/      <-- The nested, self-contained "Context Mirror" for LLM upload.
-        ├── ... (The context project tree)
-        │
-        └── TREE.txt          Context file placed at the root of the mirror.
----
-EOL
-
-    tree -a -I "${TREE_EXCLUDES}|${project_name}.bak" "$project_root" | sed "s|$project_root|.|" >> "$TREE_OUT"
-    echo "  - Project tree generated."
-
-    # Copy context files if they exist
-    for context_file in "${CONTEXT_FILES[@]}"; do
-      if [[ -f "$project_root/$context_file" ]]; then
-        cp "$project_root/$context_file" "$mirror_dir/"
-        echo "  - Copied $(basename "$context_file")."
-      fi
-    done
-}
 
 # Handle archive creation (compressed backup)
 create_archive() {
@@ -192,6 +143,10 @@ create_archive() {
         echo
         echo "Creating compressed archive..."
 
+        # Get archive extension based on compression type
+        local archive_ext
+        archive_ext=$(get_archive_extension "$COMPRESSION_TYPE")
+
         # Determine archive location
         local archive_dir archive_file
         if [[ -n "$archive_flag" ]]; then
@@ -199,7 +154,7 @@ create_archive() {
             if [[ "$archive_flag" == */ ]] || [[ -d "$archive_flag" ]]; then
                 archive_dir="$archive_flag"
                 timestamp="$(date '+%Y%m%d-%H%M%S')"
-                archive_file="$archive_dir/${project_name}-${timestamp}.tar.zst"
+                archive_file="$archive_dir/${project_name}-${timestamp}${archive_ext}"
             else
                 archive_file="$archive_flag"
                 archive_dir="$(dirname "$archive_file")"
@@ -209,7 +164,7 @@ create_archive() {
             archive_dir="$(realpath "${ARCHIVE_BASE_DIR/#\~/$HOME}")"
             mkdir -p "$archive_dir"
             timestamp="$(date '+%Y%m%d-%H%M%S')"
-            archive_file="$archive_dir/${project_name}-${timestamp}.tar.zst"
+            archive_file="$archive_dir/${project_name}-${timestamp}${archive_ext}"
         fi
 
         # Convert RSYNC_EXCLUDES to tar exclude patterns
@@ -231,15 +186,47 @@ create_archive() {
         done
 
         # Create archive directly in target location with verbosity
-        echo "  - Creating archive: $archive_file"
-        if tar --zstd -cvf "$archive_file" -C "$project_root" "${tar_excludes[@]}" .; then
+        local tar_option
+        tar_option=$(get_tar_option "$COMPRESSION_TYPE")
+        echo "  - Creating archive: $archive_file (compression: $COMPRESSION_TYPE)"
+        if [[ -n "$tar_option" ]]; then
+            tar $tar_option -cvf "$archive_file" -C "$project_root" "${tar_excludes[@]}" .
+        else
+            tar -cvf "$archive_file" -C "$project_root" "${tar_excludes[@]}" .
+        fi
+
+        if [[ $? -eq 0 ]]; then
             archive_size=$(du -sh "$archive_file" | cut -f1)
             echo "  - Archive created successfully: $archive_size"
+
+            # Encrypt archive if GPG key configured
+            if [[ -n "$GPG_KEY_ID" ]]; then
+                local encrypted_file="${archive_file}${GPG_OUTPUT_EXTENSION}"
+                echo "  - Encrypting archive with GPG..."
+                if encrypt_existing_archive "$archive_file" "$encrypted_file" "$GPG_KEY_ID"; then
+                    echo "  - Archive encrypted: $(basename "$encrypted_file")"
+                    # Use encrypted file for remote sync
+                    archive_file="$encrypted_file"
+                else
+                    echo "  - GPG encryption failed"
+                fi
+            fi
+
+            # Sync to remote if configured
+            if [[ -n "$REMOTE_SERVER" && -n "$REMOTE_PATH" ]]; then
+                if sync_to_remote "$archive_file" "$REMOTE_SERVER" "$REMOTE_PATH" "$HASH_ALGORITHM" "$CLEANUP_AFTER_TRANSFER" "false"; then
+                    echo "  - Remote sync completed successfully"
+                else
+                    echo "  - Remote sync failed"
+                fi
+            fi
 
             # Rotate old archives if MAX_ARCHIVES > 0
             if [[ "$MAX_ARCHIVES" -gt 0 && -z "$archive_flag" ]]; then
                 # List archives by modification time, newest first
-                mapfile -t archives < <(ls -1t "$archive_dir"/"${project_name}"-*.tar.zst 2>/dev/null || true)
+                # Use wildcard pattern that matches the current compression type
+                local archive_pattern="$archive_dir/${project_name}-*${archive_ext}"
+                mapfile -t archives < <(ls -1t $archive_pattern 2>/dev/null || true)
 
                 if [[ ${#archives[@]} -gt $MAX_ARCHIVES ]]; then
                     echo "  - Rotating archives (keeping $MAX_ARCHIVES most recent)"

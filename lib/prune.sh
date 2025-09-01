@@ -20,7 +20,7 @@ OPTIONS:
 MODES:
   Default          Dry-run analysis only - shows summary of junk files found
   --verbose        Detailed dry-run with full file listing
-  --bak            Creates complete .tar.zst backup then deletes junk files
+  --bak            Creates complete compressed backup then deletes junk files
   --delete         Deletes junk files immediately (no backup created)
 
 EXAMPLES:

@@ -1,2 +1,4 @@
 test/
 test/!generate.sh
+
+*config.ini
