@@ -14,6 +14,9 @@ do_backup() {
     local project_name
     project_name="$(basename "$project_root")"
 
+    echo "Backing up project: $project_name"
+    echo "Source: $project_root"
+
     # Configuration should be loaded before calling this function
     # Variables expected: BACKUP_BASE_DIR, CONFIG_FOUND, etc.
 

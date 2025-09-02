@@ -85,7 +85,7 @@ EXTENSIONS=(
 # COMPRESSION SETTINGS (override global config.ini)
 # =============================================================================
 
-# Compression algorithm: zstd, gzip, bzip2, xz, lzma, none
+# Compression algorithm: zstd, gzip, bzip2, xz, none
 #COMPRESSION_TYPE="zstd"                # Override global compression algorithm for this project
 #COMPRESSION_LEVEL="3"                  # Override global compression level for this project
 

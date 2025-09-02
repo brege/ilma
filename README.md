@@ -4,11 +4,21 @@ A comprehensive project backup and archival tool with intelligent project-type a
 
 ## Features
 
-- **Project-Type Aware**: Automatically detects and applies appropriate exclusions for Python, Node.js, Rust, LaTeX, and Bash projects
-- **Multi-Format Compression**: Support for zstd, gzip, bzip2, xz, and lzma compression algorithms
-- **GPG Encryption**: Optional file encryption for secure backup storage
-- **Remote Synchronization**: Built-in rsync integration for remote server backup
-- **Flexible Configuration**: Global settings with per-project overrides
+- **Project-Type Awareness**
+
+  Automatically detects and applies appropriate exclusions for Python, Node.js, LaTeX, Bash projects and can be extended to any project with build and run matter.
+
+- **Standard GPG, tar, and rsync core with ergonomic CLI**
+
+  Optional file encryption for secure backup storage, quick archival and backups, context trimming repos for LLM's, secure remote push for any target type
+
+- **Flexible and Granular Configuration**
+
+  Global settings with per-project overrides allowing intricate customization based on many directories.
+
+- **Prune per-project build artifacts on archival**
+
+  Can be easily configured to automatically remove disposable files and directories based on a per-project or recursive cleanup task, logging events and creating backups for recovery.
 
 ## Quick Start
 
@@ -26,26 +36,28 @@ All the disposable files and directories can be easily removed with the `prune` 
 based on project type or project-local configuration files.
 
 ```bash
-ilma prune --type latex ~/dissertation  # dry-run; --delete to prune
+ilma prune ~/dissertation \
+    --type latex \         # remove build artifacts .aux, .toc, etc
+    --log \                # log to ~/dissertation.log
+    --bak                 # backup to ~/dissertation.bak
 ```
 
-**TODO: Send encrypted archive to remote server**
+**Send encrypted archive to remote server**
 ```bash
 ilma --encrypt \
-     --compression zstd \
      --remote server.local:/storage/backups \
      --type latex \
      ~/dissertation
 ```
 
-**Config Validation**
+**Config Validation**  
 ```bash
 ilma validate
 
 ```
 **Context Overview**
 ```bash
-ilma console /path/to/project
+ilma console 
 ```
 
 ## Installation
@@ -80,6 +92,16 @@ Add the **ilma** to your `$PATH`
 echo 'export PATH="$PATH:/path/to/ilma"' >> ~/.bashrc
 source ~/.bashrc
 ```
+
+> #### Compression Algorithm Note
+> This project uses [Zstandard (`zstd`)](https://github.com/facebook/zstd) as the default compression method. It offers excellent performance—especially on modern filesystems like Btrfs—and balances speed and compression efficiency better than traditional tools.
+>
+> While `zstd` is not yet as widely supported across all platforms as `gzip`, `bzip2`, or `xz` (in that order), it is available on most modern Linux systems. This early-stage choice reflects a focus on performance and simplicity for power users, but any of the listed tools will work just as well.
+> [ [compression][1] ][ [speed][2] ][ [usage][3] ]
+
+[1]: https://rsmith.home.xs4all.nl/miscellaneous/evaluating-zstandard-compression.html?utm_source=chatgpt.com
+[2]: https://patchwork.kernel.org/project/linux-btrfs/patch/20170629194108.1674498-4-terrelln%40fb.com/?utm_source=chatgpt.com
+[3]: https://thelinuxcode.com/enable-btrfs-filesystem-compression/?utm_source=chatgpt.com
 
 ### Configuration
 
@@ -135,7 +157,7 @@ quickly without trial-and-error on your data.
 
 ```bash
 ilma validate                    # Basic configuration validation
-ilma validate full               # Include remote connectivity tests
+ilma validate full               # Includes remote connectivity tests
 ilma validate smoke-test         # End-to-end test with dummy project
 ```
 
