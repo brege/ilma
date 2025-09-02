@@ -5,6 +5,9 @@ set -euo pipefail
 ILMA_DIR="$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")"
 TOOL_ROOT="$(dirname "$ILMA_DIR")"
 
+# Store original arguments for commands that need special parsing
+ORIGINAL_ARGS=("$@")
+
 # Handle help and version - check for help early before any path resolution
 HELP_REQUESTED=false
 HELP_COMMAND=""
@@ -13,7 +16,7 @@ HELP_COMMAND=""
 for arg in "$@"; do
     if [[ "$arg" == "--help" || "$arg" == "-h" ]]; then
         HELP_REQUESTED=true
-    elif [[ "$arg" =~ ^(backup|console|scan|prune|config|decrypt|extract)$ ]]; then
+    elif [[ "$arg" =~ ^(backup|console|scan|prune|config|decrypt|extract|validate)$ ]]; then
         HELP_COMMAND="$arg"
     fi
 done
@@ -29,6 +32,7 @@ COMMANDS:
   scan                                 Scan project files and detect junk
   prune                                Dry-run analysis of files to clean (no deletion)
   config                               Show configuration details
+  validate                             Validate configuration and connectivity
   decrypt                              Decrypt GPG-encrypted archive
   extract                              Safely extract archive (prevents tarbombs)
 
@@ -88,6 +92,30 @@ if [[ "$HELP_REQUESTED" == "true" && -n "$HELP_COMMAND" ]]; then
             usage
             exit 0
             ;;
+        validate)
+            cat <<EOF
+Usage: ilma validate [LEVEL] [PROJECT_PATH]
+
+Validate configuration and connectivity for ilma setup.
+
+LEVELS:
+  basic       Basic configuration and path validation (default)
+  full        Include remote connectivity tests  
+  smoke-test  Full validation plus end-to-end test with generated dummy project
+
+Examples:
+  ilma validate                         # Basic validation of current directory
+  ilma validate full /path/to/project   # Full validation of specific project  
+  ilma validate smoke-test              # Complete test using temporary dummy project
+
+Note: smoke-test creates its own temporary test project for validation.
+
+Exit codes:
+  0 - All checks passed (warnings allowed)
+  1 - Validation failed with errors
+EOF
+            exit 0
+            ;;
         backup)
             cat <<EOF
 Usage: ilma backup [OPTIONS] [PROJECT_PATH]
@@ -132,7 +160,7 @@ DELETE_FLAG=""
 COMMAND="backup"  # Default command
 for arg in "$@"; do
     case "$arg" in
-        backup|console|scan|prune|config|decrypt|extract)
+        backup|console|scan|prune|config|decrypt|extract|validate)
             COMMAND="$arg"
             break
             ;;
@@ -146,6 +174,10 @@ done
 # Second pass - parse remaining arguments
 while (( $# > 0 )); do
     case "$1" in
+        backup|console|scan|prune|config|decrypt|extract|validate)
+            # Skip command names (already detected in first pass)
+            shift
+            ;;
         --archive)
             if [[ -n "${2:-}" && -n "${3:-}" ]]; then
                 PROJECT_ROOT="$(realpath "$2" 2>/dev/null)" || { echo "Error: Invalid project path '$2'"; exit 1; }
@@ -206,8 +238,8 @@ if [[ -z "$PROJECT_ROOT" ]]; then
     PROJECT_ROOT="$(pwd)"
 fi
 
-# Validate project directory (except for decrypt/extract commands which expect a file)
-if [[ "$COMMAND" != "decrypt" && "$COMMAND" != "extract" ]]; then
+# Validate project directory (except for decrypt/extract/validate commands which handle their own validation)
+if [[ "$COMMAND" != "decrypt" && "$COMMAND" != "extract" && "$COMMAND" != "validate" ]]; then
     if [[ ! -d "$PROJECT_ROOT" ]]; then
         echo "Error: Directory does not exist: $PROJECT_ROOT"
         exit 1
@@ -332,6 +364,49 @@ case "$COMMAND" in
         ;;
     config)
         show_config "$PROJECT_ROOT"
+        ;;
+    validate)
+        source "$ILMA_DIR/lib/validate.sh"
+        
+        # Parse validation arguments from original args
+        VALIDATION_LEVEL="basic"
+        VALIDATION_PROJECT="$(pwd)"
+        
+        # Find validate in original args and parse what follows
+        validate_found=false
+        for ((i=0; i<${#ORIGINAL_ARGS[@]}; i++)); do
+            if [[ "${ORIGINAL_ARGS[i]}" == "validate" ]]; then
+                validate_found=true
+                # Check next argument
+                if [[ $((i+1)) -lt ${#ORIGINAL_ARGS[@]} ]]; then
+                    next_arg="${ORIGINAL_ARGS[$((i+1))]}"
+                    # Check if it's a validation level (accept both smoke-test and smoketest)
+                    if [[ "$next_arg" =~ ^(basic|full|smoke-test|smoketest)$ ]]; then
+                        # Normalize smoketest to smoke-test
+                        if [[ "$next_arg" == "smoketest" ]]; then
+                            next_arg="smoke-test"
+                        fi
+                        VALIDATION_LEVEL="$next_arg"
+                        # Check for project path after level
+                        if [[ $((i+2)) -lt ${#ORIGINAL_ARGS[@]} ]]; then
+                            VALIDATION_PROJECT="$(realpath "${ORIGINAL_ARGS[$((i+2))]}" 2>/dev/null)" || {
+                                echo "Error: Invalid project path '${ORIGINAL_ARGS[$((i+2))]}'"
+                                exit 1
+                            }
+                        fi
+                    else
+                        # Next argument is project path, use default basic level
+                        VALIDATION_PROJECT="$(realpath "$next_arg" 2>/dev/null)" || {
+                            echo "Error: Invalid project path '$next_arg'"
+                            exit 1
+                        }
+                    fi
+                fi
+                break
+            fi
+        done
+        
+        run_validation "$VALIDATION_LEVEL" "$VALIDATION_PROJECT"
         ;;
     decrypt)
         source "$ILMA_DIR/lib/gpg.sh"
