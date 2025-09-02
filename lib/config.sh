@@ -31,6 +31,9 @@ load_ini_config() {
                 backup.create_compressed_archive) CREATE_COMPRESSED_ARCHIVE="$value" ;;
                 backup.max_archives) MAX_ARCHIVES="$value" ;;
                 backup.backup_xdg_dirs) BACKUP_XDG_DIRS="$value" ;;
+                backup.backup_base_dir) BACKUP_BASE_DIR="$value" ;;
+                backup.archive_base_dir) ARCHIVE_BASE_DIR="$value" ;;
+                backup.context_base_dir) CONTEXT_BASE_DIR="$value" ;;
                 rsync.remote_server) REMOTE_SERVER="$value" ;;
                 rsync.remote_path) REMOTE_PATH="$value" ;;
                 rsync.cleanup_after_transfer) CLEANUP_AFTER_TRANSFER="$value" ;;
@@ -74,10 +77,7 @@ load_config() {
         load_ini_config "$ILMA_DIR/config.ini"
     fi
 
-    # Load legacy configs for backward compatibility
-    if [[ -f "$ILMA_DIR/configs/default.conf" ]]; then
-        source "$ILMA_DIR/configs/default.conf"
-    fi
+    # Legacy configs removed - all defaults now in config.ini
 
     # Load type-specific config if specified (for archive creation only)
     TYPE_CONFIG_LOADED=false
@@ -98,7 +98,25 @@ load_config() {
     CONFIG_FOUND=false
     for config_file in ".ilma.conf" ".archive.conf" ".backup.conf"; do
         if [[ -f "$project_root/$config_file" ]]; then
+            # First pass: check if PROJECT_TYPE is specified
+            PROJECT_TYPE=""
             source "$project_root/$config_file"
+
+            # If PROJECT_TYPE is set, load that type config first
+            if [[ -n "$PROJECT_TYPE" ]]; then
+                local type_config="$ILMA_DIR/configs/${PROJECT_TYPE}-project.ilma.conf"
+                if [[ -f "$type_config" ]]; then
+                    source "$type_config"
+                elif [[ -f "$ILMA_DIR/configs/${PROJECT_TYPE}.ilma.conf" ]]; then
+                    source "$ILMA_DIR/configs/${PROJECT_TYPE}.ilma.conf"
+                else
+                    echo "Warning: PROJECT_TYPE '$PROJECT_TYPE' not found in configs/" >&2
+                fi
+
+                # Second pass: re-source local config for overrides/appends
+                source "$project_root/$config_file"
+            fi
+
             CONFIG_FOUND=true
             break
         fi
