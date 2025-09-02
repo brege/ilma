@@ -1,241 +1,219 @@
-# `ilma`
+# ilma
 
-A project-aware backup and archival tool that creates context mirrors with statistics for LLM consumption.
+A comprehensive project backup and archival tool with intelligent project-type awareness, encryption, and remote synchronization capabilities.
 
-## Dependencies
+## Features
 
-### Required
-- `rsync` - File synchronization (core backup functionality) 
-- `zstd` - Compression
-- `tree` - Project structure visualization
-- `git` - Version control integration (gracefully handles non-git directories)
-- `bc` - Command-line calculator
+- **Project-Type Aware**: Automatically detects and applies appropriate exclusions for Python, Node.js, Rust, LaTeX, and Bash projects
+- **Multi-Format Compression**: Support for zstd, gzip, bzip2, xz, and lzma compression algorithms
+- **GPG Encryption**: Optional file encryption for secure backup storage
+- **Remote Synchronization**: Built-in rsync integration for remote server backup
+- **Flexible Configuration**: Global settings with per-project overrides
 
-Debian/Ubuntu: 
-``` bash
-sudo apt install rsync tree git zstd bc
+## Quick Start
+
+**Immediate Backup**
+
+By default, **ilma** will backup the current directory and store a copy as a sibling directory.
+
+```bash
+ilma
 ```
-Fedora:
-``` bash
-sudo dnf install rsync tree git zstd bc
+
+**Prune crufty project files**
+
+All the disposable files and directories can be easily removed with the `prune` command,
+based on project type or project-local configuration files.
+
+```bash
+ilma prune --type latex ~/dissertation  # dry-run; --delete to prune
 ```
 
-Most systems have these tools pre-installed. On minimal systems, you may need to install `tree` and `zstd`.
+**TODO: Send encrypted archive to remote server**
+```bash
+ilma --encrypt \
+     --compression zstd \
+     --remote server.local:/storage/backups \
+     --type latex \
+     ~/dissertation
+```
+
+**Config Validation**
+```bash
+ilma validate
+
+```
+**Context Overview**
+```bash
+ilma console /path/to/project
+```
 
 ## Installation
 
-``` bash
+Clone the repository
+```bash
 git clone https://github.com/brege/ilma
 cd ilma
 ```
 
-1. Add `ilma` to your PATH
-2. (Optional) Add `.ilma.conf` to your global git excludes: `echo ".ilma.conf" >> ~/.config/git/ignore`
-3. Create project-specific configuration files as needed
-
-## Usage
-
-``` bash
-# Backup current directory (default behavior)
-ilma
-
-# Backup specific project
-ilma /path/to/project
-
-# Show project statistics (no backup)
-ilma console
-ilma console /path/to/project
-
-# Scan for junk files (all paths marked as artifacts)
-ilma scan --type python --pretty
-
-# Junk file pruning workflow
-ilma prune --verbose                 # Preview what would be deleted
-ilma prune --type latex --bak        # Backup then clean LaTeX project
-ilma prune --type python --delete    # Delete junk files (no backup)
-
-# Show configuration
-ilma config
-ilma config /path/to/project
+Fedora dependencies
+```bash
+sudo dnf install rsync tree git zstd bc pv
+# all compression tools (only need one)
+sudo dnf install zstd gzip bzip2 xz
 ```
 
-### Commands
-
-**`ilma [backup]`** - Create backup and context mirror (default command)
-**`ilma console`**  - Show project statistics and analysis  
-**`ilma scan`**     - Scan for junk files based on project type
-**`ilma prune`**    - Analyze and optionally remove junk files
-**`ilma config`**   - Display current configuration settings
-
-Use `ilma COMMAND --help` for detailed help on each command.
-
-### Console
-
-**`ilma`** has a built-in statistics view that shows file counts, line counts, and size reduction analysis.
-
-``` text
-> ~/thunder-muscle$ ilma console
-
-  Mirror Reduction Stats
-  ----------------------
-  Metric                 Source     Mirror      Delta Reduction
-  -----                  ------     ------      ----- --------
-  Total files              3249         50       3199    98.5%
-  .py files                1260         10       1250    99.2%
-  .md files                   5          3          2    40.0%
-  .json files                16         12          4    25.0%
-  Total lines           2182245    1453607     728638    33.4%
-  .py lines              372962       1954     371008    99.5%
-  .md lines                 482        254        228    47.3%
-  .json lines           1444974    1444364        610     0.0%
-  Total size (MB)           288        196         92    31.9%
-  ----------------------
-  Mirror token estimate: 51331435 (~4 chars per token)
-  git: [ commits: 9 ][ latest: 2025-08-29:16:42 (64ebf25) docs: update README.md ]
-  tip: ilma console (this display) | ilma --help
+Debian/Ubuntu dependencies
+```bash
+sudo apt install rsync tree git zstd bc pv
+sudo apt install zstd gzip bzip2 xz-utils
 ```
-This overview is useful for quickly evaluating the impact your source code might have on an LLM's context window.
 
-Using **`ilma`** from your project root will automatically create a minimal snapshot of your project in the same parent directory as the project itself. An `.ilma.conf` in the source root allows finer control over replaceable assets to duplicate.
+Validate dependencies
+```bash
+./lib/deps.sh check
+./lib/deps.sh install-help
+```
 
-## Default Configuration
+Add the **ilma** to your `$PATH`
+```bash
+echo 'export PATH="$PATH:/path/to/ilma"' >> ~/.bashrc
+source ~/.bashrc
+```
 
-By default, **`ilma`** uses minimal exclusions and tracks basic file types:
+### Configuration
 
-### Default Exclusions
-- `.git/` - Git repository data
-- `.gitignore` - Git ignore file
-- `.archive.conf` - Legacy config file
-- `.ilma.conf` - ilma config file
-- `.backup.conf` - Alternative config file
+**ilma** works out of the box with sensible defaults, but can be customized extensively.
 
-### Default File Extensions Tracked
-- `md` - Markdown files
-- `txt` - Text files
+#### Global
+Copy and customize the global **`config.ini`** file
+```bash
+cp config.example.ini config.ini
+```
+#### Per-Project
 
-### Default Backup Location
-- Current directory (`.`) - Working backups stored here by default
-- No compressed archives by default
-- No XDG directory backup by default
+Create **`.ilma.conf`** in any project for custom strategies.
+See **[`configs/dot-ilma.conf.example`](./configs/dot-ilma.conf.example)** for a kitchen sink example.
 
-## Project Configuration
+---
 
-Create a `.ilma.conf` file in your project root to customize behavior:
+| Supported Project Types | Common Exclusions               |
+|:-----------|:---------------------------------------------|
+| **python** | `__pycache__`, `venv`, `.pytest_cache`, etc. |
+| **node**   | `node_modules`, `dist`, `build`, etc.        |
+| **latex**  | `.aux`, `.log`, `.pdf`, etc.                 |
+| **bash**   | `.log`, `.tmp`, `.out`, backup files, etc.   |
+
+See **[`configs/`](./configs)** for common language presets.
+
+---
+
+## Commands
+
+### Backup Operations
+```bash
+cd /path/to/project
+ilma                             # Backup current directory
+ilma [PROJECT_PATH]              # Backup specified directory
+```
+
+### Analysis & Statistics
+
+This command is hand if you share your project with LLM's. 
+It provides a quick overview of file and estimated token counts.
 
 ```bash
-# Example ABC configuration (Archive, Backup, Context)
-EXTENSIONS=(js ts md json)
-BACKUP_XDG_DIRS=true
-BACKUP_BASE_DIR="../backup"
-ARCHIVE_BASE_DIR="../archive"
-CONTEXT_BASE_DIR="../context"
-CREATE_COMPRESSED_ARCHIVE=true
-MAX_ARCHIVES=3
-
-RSYNC_EXCLUDES+=(
-    --exclude 'node_modules/'
-    --exclude 'dist/'
-)
-
-CONTEXT_FILES=(
-    "docs/README.md"
-    "CHANGELOG.md"
-)
-
-TREE_EXCLUDES+="|node_modules|dist"
+ilma console [PROJECT_PATH]      # Show detailed project statistics
+ilma scan [PROJECT_PATH]         # Show files that would be excluded
+ilma scan --type python --pretty # Scan with specific project type
 ```
 
-## Configuration Options
+### Validation & Troubleshooting
 
-### Backup Locations
-- `BACKUP_BASE_DIR` - Where working backups are stored (default: current directory)
-- `ARCHIVE_BASE_DIR` - Where compressed archives are stored (empty = disabled)
-- `CONTEXT_BASE_DIR` - Where context mirrors are stored (empty = nested in backup)
-- `CREATE_COMPRESSED_ARCHIVE` - Create timestamped .tar.zst files (default: false)
-- `MAX_ARCHIVES` - Number of compressed archives to keep (default: 1)
+After customizing your configuration, you can validate your setup
+quickly without trial-and-error on your data.
 
-### XDG Directory Backup
-- `BACKUP_XDG_DIRS` - Backup user config directories (default: false)
-- `XDG_PATHS` - Directories to check (default: `~/.config` `~/.local/share` `~/.cache`)
-
-### File Tracking
-- `EXTENSIONS` - File types to track in statistics
-- `RSYNC_EXCLUDES` - Patterns to exclude from backup (use `+=` to extend defaults)
-- `CONTEXT_FILES` - Additional files to copy to mirror root
-- `TREE_EXCLUDES` - Patterns to exclude from tree output (use `+=` to extend)
-
-## Example Configurations
-
-See [`configs/`](./configs) for example configuration files.
-
-``` 
-configs/
-├── bash-project.ilma.conf    ✔ sh,bash,conf ..    ✖ log,tmp ..
-├── default.conf              ✔ md,txt ..          ✖ .git,.ilma.conf ..
-├── latex-project.ilma.conf   ✔ tex,bbl ..         ✖ .aux,.log,.synctex.gz ..
-├── minimal.ilma.conf         ✔ md,txt ..
-├── node-project.ilma.conf    ✔ js,ts,md,json ..   ✖ node_modules,package-lock.json ..
-└── python-project.ilma.conf  ✔ py,md,yaml ..      ✖ .pyc,__pycache__,venv ..
-```
-
-### Python Project
 ```bash
-# .ilma.conf
-EXTENSIONS=(py md txt yaml json)
-BACKUP_XDG_DIRS=false
+ilma validate                    # Basic configuration validation
+ilma validate full               # Include remote connectivity tests
+ilma validate smoke-test         # End-to-end test with dummy project
+```
 
+### Configuration
+
+Output your current configuration at any time, in or outside of a project.
+
+```bash
+ilma config [PROJECT_PATH]       # Show resolved configuration
+```
+
+### Archive Management
+
+With GPG, you can encrypt your backups for secure storage,
+especially useful on remote servers.
+
+```bash
+ilma extract archive.tar.zst
+ilma decrypt file.tar.zst.gpg
+```
+
+## Configuration File Examples
+
+**Simple Project Backup**
+
+There are two main ways to make use of language-specific presets.
+
+In **`.ilma.conf`**
+```bash .ilma.conf
+PROJECT_TYPE="python"
+```
+which is equivalent to the `ilma --type python` command.
+
+**Encrypted Remote Backup**
+```bash .ilma.conf
+PROJECT_TYPE="node"
+GPG_KEY_ID="your-gpg-key-id or email"
+REMOTE_SERVER="server.local"
+REMOTE_PATH="/storage/backups"
+COMPRESSION_TYPE="zstd" 
+COMPRESSION_LEVEL="3"
+```
+
+**Custom Exclusions**
+```bash .ilma.conf
+PROJECT_TYPE="python"
+RSYNC_EXCLUDES=() # Clear default excludes
 RSYNC_EXCLUDES+=(
-    --exclude '__pycache__/'
-    --exclude '*.pyc'
-    --exclude '*.pyo'
-    --exclude '.pytest_cache/'
-    --exclude 'venv/'
-    --exclude '.venv/'
-    --exclude 'env/'
-    --exclude '.tox/'
-    --exclude 'dist/'
-    --exclude 'build/'
-    --exclude '*.egg-info/'
+    --exclude '*.log'
+    --exclude 'tmp/'
+    --exclude 'paraview/*.vtk'
 )
-
-TREE_EXCLUDES+="|__pycache__|venv|.venv|dist|build"
+CONTEXT_FILES+=(
+    "AGENTS.md"
+)
 ```
 
-## ABC Architecture
+## Advanced Usage
 
-**`ilma`** optionally provides an Archive-Backup-Context pattern.  The behavior is controlled by the `.ilma.conf` file in the project root.
-
+### Backup Hierarchy
+**ilma** creates a structured backup hierarchy:
 ```
-../
-├── archive/project-timestamp.tar.zst  # Compressed archives
-├── backup/project.bak/                # Full backups  
-└── context/project/                   # Context mirrors
-```
-
-You can make use of **`ilma`**'s configuration to intelligently clean up build artifacts and other junk files.
-Run with `ilma prune --bak my-project` to create a complete snapshot of your project, while removing junk files.
-
-``` bash
-my-projects$ ilma prune dissertation/ --type latex  # [options] 
-# options: --verbose, --bak, --delete
+project.bak/                     # Main backup directory
+├── project-files/               # Complete project mirror
+├── project/                     # Context mirror (key files only) 
+└── project.tar.zst              # Compressed archive (if enabled)
 ```
 
-``` text
-Directory: /home/me/my-projects/dissertation
-Type: latex
-
-Found 22 junk items
-
-Preview (first 5 items):
-  one-gamma-vs-density.aux
-  31-dissertation-defense.aux
-  ejecta.aux
-  initial-data.aux
-  matter.aux
-  ... and 17 more items
-
-Use --verbose to see detailed analysis
-```
+### Configuration Inheritance
+**ilma** uses a hierarchical configuration system:
+1. **Global defaults** from `config.ini`, currently at **ilma's repo root**
+2. **Project type config** (e.g., `configs/python-project.ilma.conf`) 
+3. **Local overrides** from `.ilma.conf`
 
 ## License
-[GPLv3](https://www.gnu.org/licenses/gpl-3.0.txt)
+
+[GPLv3](https://www.gnu.org/licenses/gpl-3.0.en.html)
+
+## Development
+
+See [`lib/index.md`](./lib/index.md).
