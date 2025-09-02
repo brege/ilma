@@ -244,6 +244,26 @@ create_archive() {
 
 # If called directly as a command
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    # Handle help flag
+    if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
+        cat << 'EOF'
+Usage: backup.sh [PROJECT_PATH] [--archive]
+
+Standalone backup tool - creates backup and context mirror for a project.
+
+Arguments:
+  PROJECT_PATH    Path to project directory (default: current directory)
+  --archive       Create compressed archive after backup
+
+Examples:
+  ./lib/backup.sh /path/to/project
+  ./lib/backup.sh . --archive
+
+This tool uses the same configuration system as the main ilma command.
+EOF
+        exit 0
+    fi
+
     # This would be the backup command entry point
     PROJECT_ROOT="${1:-$(pwd)}"
     ARCHIVE_FLAG="${2:-}"

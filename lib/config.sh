@@ -234,6 +234,27 @@ show_config() {
 
 # If called directly as a command
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    # Handle help flag
+    if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
+        cat << 'EOF'
+Usage: config.sh [PROJECT_PATH] [TYPE]
+
+Standalone configuration tool - loads and displays project configuration.
+
+Arguments:
+  PROJECT_PATH    Path to project directory (default: current directory)
+  TYPE            Project type for --type flag simulation
+
+Examples:
+  ./lib/config.sh /path/to/project
+  ./lib/config.sh . python
+  ./lib/config.sh /path/to/project bash
+
+Shows resolved configuration including PROJECT_TYPE inheritance and all settings.
+EOF
+        exit 0
+    fi
+
     PROJECT_ROOT="${1:-$(pwd)}"
     TYPE="${2:-}"
 

@@ -272,6 +272,25 @@ show_backup_stats() {
 
 # If called directly as a command
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    # Handle help flag
+    if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
+        cat << 'EOF'
+Usage: console.sh [PROJECT_PATH]
+
+Standalone project analysis tool - shows detailed project statistics.
+
+Arguments:
+  PROJECT_PATH    Path to project directory (default: current directory)
+
+Examples:
+  ./lib/console.sh /path/to/project
+  ./lib/console.sh .
+
+Displays file counts, line counts, and size statistics organized by file extension.
+EOF
+        exit 0
+    fi
+
     # This would be the analyze/console command entry point
     PROJECT_ROOT="${1:-$(pwd)}"
 

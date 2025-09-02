@@ -8,6 +8,26 @@ set -euo pipefail
 declare -a SKIP_DIRS=()
 declare -a SKIP_FILE_PATTERNS=()
 
+# Handle help flag
+if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
+    cat << 'EOF'
+Usage: excludes.sh config1.conf [config2.conf ...]
+
+Exclusion processing utility - collects skip directories and file patterns from config files.
+
+Arguments:
+  config1.conf    First configuration file to process
+  config2.conf    Additional configuration files (optional)
+
+Examples:
+  ./lib/excludes.sh project.conf
+  ./lib/excludes.sh config1.conf config2.conf
+
+Outputs SKIP_DIRS and SKIP_FILE_PATTERNS arrays for use in other scripts.
+EOF
+    exit 0
+fi
+
 if (( $# == 0 )); then
     echo "Usage: $0 config1.conf [config2.conf ...]"
     exit 1
