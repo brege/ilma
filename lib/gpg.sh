@@ -1,6 +1,28 @@
 #!/bin/bash
 # lib/gpg.sh - GPG encryption and decryption functions
 
+# Generic file encryption function
+encrypt_file() {
+    local input_file="$1"
+    local output_file="$2"
+
+    if [[ -z "$GPG_KEY_ID" ]]; then
+        echo "Error: GPG_KEY_ID not configured" >&2
+        return 1
+    fi
+
+    echo "Encrypting $input_file with GPG key ID $GPG_KEY_ID..."
+    gpg --yes --batch --encrypt --recipient "$GPG_KEY_ID" -o "$output_file" "$input_file"
+
+    if [[ $? -eq 0 ]]; then
+        echo "Encryption successful: $output_file"
+        return 0
+    else
+        echo "Encryption failed" >&2
+        return 1
+    fi
+}
+
 # Encrypt an existing archive file
 encrypt_existing_archive() {
     local input_path="$1"

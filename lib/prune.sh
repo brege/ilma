@@ -61,9 +61,31 @@ do_prune() {
             return 0
         fi
 
+        # Initialize logging for destructive operation
+        source "$ILMA_DIR/lib/log.sh"
+        local log_file
+        log_file="$(get_log_file "prune")"
+        init_log "$log_file" "prune" "$project_root"
+        log_summary "$log_file" "Starting prune operation on ${#files[@]} files"
+
+        echo "Logging operation to: $log_file"
+
+        local deleted=0
+        local failed=0
         for file in "${files[@]}"; do
-            rm -rf "$file" && echo "DELETED: $file" || echo "FAILED: $file"
+            if rm -rf "$file" 2>/dev/null; then
+                echo "DELETED: $file"
+                log_file_op "$log_file" "DELETE" "$file" "SUCCESS"
+                ((deleted++))
+            else
+                echo "FAILED: $file"
+                log_file_op "$log_file" "DELETE" "$file" "FAILED"
+                ((failed++))
+            fi
         done
+
+        log_summary "$log_file" "Prune operation completed: $deleted deleted, $failed failed"
+        echo "Operation logged to: $log_file"
     elif [[ "$verbose" == "true" ]]; then
         # Verbose dry-run: show detailed analysis
         "$ILMA_DIR/lib/scan.sh" --type "$type" --pretty "$project_root"

@@ -179,13 +179,6 @@ validate_compression() {
                 validate_fail "Compression algorithm" "xz not found in PATH"
             fi
             ;;
-        lzma)
-            if command -v lzma &> /dev/null; then
-                validate_pass "Compression algorithm (lzma)"
-            else
-                validate_fail "Compression algorithm" "lzma not found in PATH"
-            fi
-            ;;
         none)
             validate_pass "Compression algorithm (none/disabled)"
             ;;

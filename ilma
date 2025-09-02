@@ -37,22 +37,31 @@ COMMANDS:
   extract                              Safely extract archive (prevents tarbombs)
 
 OPTIONS:
-  --archive PROJECT_PATH ARCHIVE_PATH  Create archive at specific location
+  --archive [OUTPUT_PATH]              Create compressed archive only
+  --encrypt [OUTPUT_PATH]              Create encrypted archive only  
+  --context [OUTPUT_PATH]              Create context mirror only
+  --remote SERVER:/PATH                Sync directly to remote server
   --type TYPE                          Use project type configuration
   --pretty                             Show detailed output (for scan command)
   --verbose                            Show detailed output (for prune command)
   --bak                                Create backup then delete junk files (for prune command)
   --delete                             Delete junk files without backup (for prune command)
+  --no-extract                         Decrypt only, do not extract archive (for decrypt command)
+  --force                              Replace existing directories (for decrypt/extract commands)
+  --outdir DIR                         Extract to specific directory (for decrypt/extract commands)
   -h, --help                           Show this help
 
 PROJECT TYPES:
-  default, minimal, bash, latex, node, python
+  bash, latex, node, python
 
 EXAMPLES:
   ilma                                 Backup current directory
-  ilma ~/my-project                    Backup specific project
+  ilma ~/my-project                    Backup specific project  
   ilma --type latex                    Backup, ignoring common LaTeX cruft
-  ilma --archive project archive/      Archive project to a specific directory
+  ilma --archive                       Create compressed archive only
+  ilma --encrypt                       Create encrypted archive only
+  ilma --archive --remote srv:/backup  Archive and upload to remote server
+  ilma --context ~/docs                Create context mirror only
   ilma console                         Show project statistics
   ilma scan --type python --pretty     Scan Python project with detailed output
   ilma prune --type latex --verbose    Analyze LaTeX project cruft (dry-run only)
@@ -129,16 +138,42 @@ EOF
             ;;
         extract)
             cat <<EOF
-Usage: ilma extract <archive_file>
+Usage: ilma extract [OPTIONS] <archive_file>
 
 Safely extract archive to contained directory (prevents tarbombs).
 
 Creates a directory based on the archive name and extracts contents there.
 Supports all compression formats: .tar.zst, .tar.gz, .tar.bz2, .tar.xz, etc.
 
+OPTIONS:
+  --force            Replace existing target directory if it exists
+  --outdir DIR       Extract to specific directory instead of auto-generated name
+
 Examples:
-  ilma extract project.tar.zst     # Extracts to project/
-  ilma extract backup.tar.gz       # Extracts to backup/
+  ilma extract project.tar.zst             # Extracts to project/
+  ilma extract backup.tar.gz               # Extracts to backup/
+  ilma extract --force project.tar.zst     # Replace existing project/ directory
+  ilma extract --outdir temp backup.tar.gz # Extract to temp/ directory
+EOF
+            exit 0
+            ;;
+        decrypt)
+            cat <<EOF
+Usage: ilma decrypt [OPTIONS] <encrypted_file>
+
+Decrypt a GPG-encrypted file and optionally extract if it's an archive.
+
+OPTIONS:
+  --no-extract       Decrypt only, do not extract archive
+  --force            Replace existing target directory if it exists
+  --outdir DIR       Extract to specific directory instead of auto-generated name
+
+Examples:
+  ilma decrypt backup.tar.zst.gpg              # Decrypt and extract to backup/
+  ilma decrypt project.tar.gz.gpg             # Decrypt and extract to project/
+  ilma decrypt --no-extract data.tar.gpg      # Decrypt to data.tar only
+  ilma decrypt --force backup.tar.zst.gpg     # Replace existing backup/ directory
+  ilma decrypt --outdir restored backup.gpg   # Extract to restored/ directory
 EOF
             exit 0
             ;;
@@ -149,12 +184,18 @@ fi
 COMMAND=""
 TYPE=""
 ARCHIVE_FLAG=""
+ENCRYPT_FLAG=""
+CONTEXT_FLAG=""
+REMOTE_FLAG=""
 CONFIG_FLAG=""
 PROJECT_ROOT=""
 VERBOSE_FLAG=""
 PRETTY_FLAG=""
 BAK_FLAG=""
 DELETE_FLAG=""
+NO_EXTRACT_FLAG=""
+FORCE_FLAG=""
+OUTDIR_FLAG=""
 
 # First pass - scan all arguments to identify command
 COMMAND="backup"  # Default command
@@ -179,14 +220,42 @@ while (( $# > 0 )); do
             shift
             ;;
         --archive)
-            if [[ -n "${2:-}" && -n "${3:-}" ]]; then
-                PROJECT_ROOT="$(realpath "$2" 2>/dev/null)" || { echo "Error: Invalid project path '$2'"; exit 1; }
-                ARCHIVE_FLAG="$3"
-                shift 3
+            ARCHIVE_FLAG="true"
+            # Check if next argument is explicitly an output path (ends with archive extension)
+            if [[ -n "${2:-}" && "${2:0:1}" != "-" && "${2}" =~ \.(tar\.|tgz|tbz2|txz).*$ ]]; then
+                ARCHIVE_FLAG="$2"
+                shift 2
             else
-                echo "Error: --archive requires PROJECT_PATH and ARCHIVE_PATH"
+                shift
+            fi
+            ;;
+        --encrypt)
+            ENCRYPT_FLAG="true"
+            # Check if next argument is explicitly an output path (ends with archive extension or .gpg)
+            if [[ -n "${2:-}" && "${2:0:1}" != "-" && ( "${2}" =~ \.(tar\.|tgz|tbz2|txz).*$ || "${2}" =~ \.gpg$ ) ]]; then
+                ENCRYPT_FLAG="$2"
+                shift 2
+            else
+                shift
+            fi
+            ;;
+        --context)
+            CONTEXT_FLAG="true"
+            # Check if next argument is explicitly an output path (contains / or doesn't look like a directory name)
+            if [[ -n "${2:-}" && "${2:0:1}" != "-" && "${2}" =~ "/" ]]; then
+                CONTEXT_FLAG="$2"
+                shift 2
+            else
+                shift
+            fi
+            ;;
+        --remote)
+            if [[ -z "${2:-}" ]]; then
+                echo "Error: --remote requires SERVER:/PATH argument" >&2
                 exit 1
             fi
+            REMOTE_FLAG="$2"
+            shift 2
             ;;
         --config)
             CONFIG_FLAG="true"
@@ -215,6 +284,22 @@ while (( $# > 0 )); do
         --delete)
             DELETE_FLAG="true"
             shift
+            ;;
+        --no-extract)
+            NO_EXTRACT_FLAG="true"
+            shift
+            ;;
+        --force)
+            FORCE_FLAG="true"
+            shift
+            ;;
+        --outdir)
+            if [[ -z "${2:-}" ]]; then
+                echo "Error: --outdir requires a directory path" >&2
+                exit 1
+            fi
+            OUTDIR_FLAG="$2"
+            shift 2
             ;;
         backup|console|scan|prune|config|decrypt|extract)
             # Skip command names
@@ -259,27 +344,85 @@ if [[ "$CONFIG_FLAG" == "true" || "$COMMAND" == "config" ]]; then
     exit 0
 fi
 
-handle_special_modes "$ARCHIVE_FLAG" "$PROJECT_ROOT"
-
 # Dispatch to appropriate command
 case "$COMMAND" in
     backup)
-        source "$ILMA_DIR/lib/backup.sh"
-        do_backup "$PROJECT_ROOT"
-        create_archive "$PROJECT_ROOT" "$ARCHIVE_FLAG"
-
-        # Show stats after backup completion
-        if [[ "$CONFIG_FOUND" == "true" ]]; then
-            # Set mirror directory path for stats
-            if [[ -n "$CONTEXT_BASE_DIR" ]]; then
-                MIRROR_DIR="$CONTEXT_BASE_DIR/$PROJECT_NAME"
-            else
-                MAIN_BACKUP_DIR="$BACKUP_BASE_DIR/${PROJECT_NAME}.bak"
-                MIRROR_DIR="$MAIN_BACKUP_DIR/$PROJECT_NAME"
+        # Load config for all backup modes
+        source "$ILMA_DIR/lib/config.sh"
+        load_config "$PROJECT_ROOT" "$TYPE"
+        
+        # Handle specialized backup modes
+        if [[ ( "$ARCHIVE_FLAG" == "true" || -n "$ARCHIVE_FLAG" ) && ( "$ENCRYPT_FLAG" == "true" || -n "$ENCRYPT_FLAG" ) ]]; then
+            # Combined archive + encrypt mode
+            source "$ILMA_DIR/lib/backup/encrypt.sh"
+            output_path="$([[ "$ENCRYPT_FLAG" == "true" ]] && echo "" || echo "$ENCRYPT_FLAG")"
+            create_encrypted_archive "$PROJECT_ROOT" "$output_path"
+            
+            # Handle remote upload if specified
+            if [[ -n "$REMOTE_FLAG" ]]; then
+                source "$ILMA_DIR/lib/backup/remote.sh"
+                encrypted_file="$output_path"
+                [[ -z "$encrypted_file" ]] && encrypted_file="$(dirname "$PROJECT_ROOT")/$(basename "$PROJECT_ROOT")$(get_archive_extension "$COMPRESSION_TYPE").gpg"
+                sync_archive_to_remote "$encrypted_file" "$REMOTE_FLAG"
             fi
+            
+        elif [[ "$ARCHIVE_FLAG" == "true" || -n "$ARCHIVE_FLAG" ]]; then
+            # Archive-only mode
+            source "$ILMA_DIR/lib/backup/archive.sh"
+            output_path="$([[ "$ARCHIVE_FLAG" == "true" ]] && echo "" || echo "$ARCHIVE_FLAG")"
+            create_archive_only "$PROJECT_ROOT" "$output_path"
+            
+            # Handle remote upload if specified
+            if [[ -n "$REMOTE_FLAG" ]]; then
+                source "$ILMA_DIR/lib/backup/remote.sh"
+                archive_file="$output_path"
+                [[ -z "$archive_file" ]] && archive_file="$(dirname "$PROJECT_ROOT")/$(basename "$PROJECT_ROOT")$(get_archive_extension "$COMPRESSION_TYPE")"
+                sync_archive_to_remote "$archive_file" "$REMOTE_FLAG"
+            fi
+            
+        elif [[ "$ENCRYPT_FLAG" == "true" || -n "$ENCRYPT_FLAG" ]]; then
+            # Encrypt-only mode
+            source "$ILMA_DIR/lib/backup/encrypt.sh"
+            output_path="$([[ "$ENCRYPT_FLAG" == "true" ]] && echo "" || echo "$ENCRYPT_FLAG")"
+            create_encrypted_archive "$PROJECT_ROOT" "$output_path"
+            
+            # Handle remote upload if specified
+            if [[ -n "$REMOTE_FLAG" ]]; then
+                source "$ILMA_DIR/lib/backup/remote.sh"
+                encrypted_file="$output_path"
+                [[ -z "$encrypted_file" ]] && encrypted_file="$(dirname "$PROJECT_ROOT")/$(basename "$PROJECT_ROOT")$(get_archive_extension "$COMPRESSION_TYPE").gpg"
+                sync_archive_to_remote "$encrypted_file" "$REMOTE_FLAG"
+            fi
+            
+        elif [[ "$CONTEXT_FLAG" == "true" || -n "$CONTEXT_FLAG" ]]; then
+            # Context-only mode
+            source "$ILMA_DIR/lib/backup/context.sh"
+            output_path="$([[ "$CONTEXT_FLAG" == "true" ]] && echo "" || echo "$CONTEXT_FLAG")"
+            create_context_only "$PROJECT_ROOT" "$output_path"
+            
+        elif [[ -n "$REMOTE_FLAG" ]]; then
+            # Direct remote sync mode
+            source "$ILMA_DIR/lib/backup/remote.sh"
+            sync_to_remote "$PROJECT_ROOT" "$REMOTE_FLAG"
+            
+        else
+            # Standard backup mode
+            source "$ILMA_DIR/lib/backup.sh"
+            do_backup "$PROJECT_ROOT"
 
-            source "$ILMA_DIR/lib/console.sh"
-            show_backup_stats "$PROJECT_ROOT" "$MIRROR_DIR"
+            # Show stats after backup completion
+            if [[ "$CONFIG_FOUND" == "true" ]]; then
+                # Set mirror directory path for stats
+                if [[ -n "$CONTEXT_BASE_DIR" ]]; then
+                    MIRROR_DIR="$CONTEXT_BASE_DIR/$PROJECT_NAME"
+                else
+                    MAIN_BACKUP_DIR="$BACKUP_BASE_DIR/${PROJECT_NAME}.bak"
+                    MIRROR_DIR="$MAIN_BACKUP_DIR/$PROJECT_NAME"
+                fi
+
+                source "$ILMA_DIR/lib/console.sh"
+                show_backup_stats "$PROJECT_ROOT" "$MIRROR_DIR"
+            fi
         fi
         ;;
     console)
@@ -409,82 +552,12 @@ case "$COMMAND" in
         run_validation "$VALIDATION_LEVEL" "$VALIDATION_PROJECT"
         ;;
     decrypt)
-        source "$ILMA_DIR/lib/gpg.sh"
-        if [[ -z "$PROJECT_ROOT" ]]; then
-            echo "Error: No input file specified for decryption"
-            exit 1
-        fi
-        
-        # Use PROJECT_ROOT as input file for decrypt command
-        input_file="$PROJECT_ROOT"
-        output_file="${input_file%.gpg}"
-        
-        if decrypt_file "$input_file" "$output_file"; then
-            if is_archive "$output_file"; then
-                extract_dir="./$(basename "${output_file%.*}")"
-                echo "Extracting to $extract_dir..."
-                if extract_archive "$output_file" "$extract_dir"; then
-                    echo "Decryption and extraction complete: $extract_dir"
-                else
-                    echo "Decryption successful, but extraction failed: $output_file"
-                fi
-            else
-                echo "Decryption complete: $output_file"
-            fi
-        fi
+        source "$ILMA_DIR/lib/decrypt.sh"
+        do_decrypt "$PROJECT_ROOT" "$NO_EXTRACT_FLAG" "$FORCE_FLAG" "$OUTDIR_FLAG"
         ;;
     extract)
-        source "$ILMA_DIR/lib/compression.sh"
-        if [[ -z "$PROJECT_ROOT" ]]; then
-            echo "Error: No archive file specified for extraction"
-            exit 1
-        fi
-        
-        # Use PROJECT_ROOT as input archive file
-        archive_file="$PROJECT_ROOT"
-        
-        if [[ ! -f "$archive_file" ]]; then
-            echo "Error: Archive file does not exist: $archive_file"
-            exit 1
-        fi
-        
-        if ! is_archive "$archive_file"; then
-            echo "Error: File is not a recognized archive: $archive_file"
-            exit 1
-        fi
-        
-        # Create safe extraction directory based on archive name
-        archive_base="$(basename "$archive_file")"
-        # Remove all extensions (.tar.zst -> archive_base, .tar.gz -> archive_base, etc)
-        safe_dir="${archive_base%%.*}"
-        
-        if [[ -e "$safe_dir" ]]; then
-            echo "Error: Target directory already exists: $safe_dir"
-            exit 1
-        fi
-        
-        echo "Safely extracting $archive_file to $safe_dir/"
-        mkdir -p "$safe_dir"
-        
-        # Use compression library to determine extraction method
-        compression_type=$(get_compression_type_from_file "$archive_file")
-        tar_option=$(get_tar_option "$compression_type")
-        
-        if [[ -n "$tar_option" ]]; then
-            tar $tar_option -xf "$archive_file" -C "$safe_dir"
-        else
-            tar -xf "$archive_file" -C "$safe_dir"
-        fi
-        
-        if [[ $? -eq 0 ]]; then
-            echo "Archive extracted successfully to: $safe_dir/"
-            echo "Contents:"
-            ls -la "$safe_dir/"
-        else
-            echo "Extraction failed"
-            rmdir "$safe_dir" 2>/dev/null
-            exit 1
-        fi
+        source "$ILMA_DIR/lib/decrypt.sh"
+        do_extract "$PROJECT_ROOT" "$FORCE_FLAG" "$OUTDIR_FLAG"
         ;;
     *)
         echo "Error: Unknown command '$COMMAND'"

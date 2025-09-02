@@ -18,9 +18,6 @@ get_compression_cmd() {
         xz)
             echo "xz -${comp_level}"
             ;;
-        lzma)
-            echo "lzma -${comp_level}"
-            ;;
         none)
             echo "cat"
             ;;
@@ -39,7 +36,6 @@ get_archive_extension() {
         gzip) echo ".tar.gz" ;;
         bzip2) echo ".tar.bz2" ;;
         xz) echo ".tar.xz" ;;
-        lzma) echo ".tar.lzma" ;;
         none) echo ".tar" ;;
         *) echo ".tar" ;;
     esac
@@ -53,7 +49,6 @@ get_tar_option() {
         gzip) echo "-z" ;;
         bzip2) echo "-j" ;;
         xz) echo "-J" ;;
-        lzma) echo "--lzma" ;;
         none) echo "" ;;
         *) echo "" ;;
     esac
@@ -61,12 +56,12 @@ get_tar_option() {
 
 is_archive() {
     local file="$1"
-    [[ "$file" =~ \.(tar|tar\.gz|tar\.bz2|tar\.xz|tar\.zst|tar\.lzma|tgz|tbz2|txz)$ ]]
+    [[ "$file" =~ \.(tar|tar\.gz|tar\.bz2|tar\.xz|tar\.zst|tgz|tbz2|txz)$ ]]
 }
 
 is_compressed_archive() {
     local file="$1"
-    [[ "$file" =~ \.(tar\.gz|tar\.bz2|tar\.xz|tar\.zst|tar\.lzma|tgz|tbz2|txz)$ ]]
+    [[ "$file" =~ \.(tar\.gz|tar\.bz2|tar\.xz|tar\.zst|tgz|tbz2|txz)$ ]]
 }
 
 get_compression_type_from_file() {
@@ -77,7 +72,6 @@ get_compression_type_from_file() {
         *.tar.gz|*.tgz) echo "gzip" ;;
         *.tar.bz2|*.tbz2) echo "bzip2" ;;
         *.tar.xz|*.txz) echo "xz" ;;
-        *.tar.lzma) echo "lzma" ;;
         *.tar) echo "none" ;;
         *) echo "none" ;;
     esac
