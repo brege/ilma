@@ -3,6 +3,31 @@
 
 set -e
 
+# Handle help flag
+if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
+    cat << 'EOF'
+Usage: generate.sh [TARGET_DIR]
+
+Generate dummy project structures for testing ilma functionality.
+
+Arguments:
+  TARGET_DIR    Directory where test projects will be created (default: /tmp/dummy-root)
+
+Examples:
+  ./test/generate.sh                    # Creates projects in /tmp/dummy-root
+  ./test/generate.sh /tmp/my-tests      # Creates projects in /tmp/my-tests
+
+Generated Projects:
+  dummy-project-python     Python project with venv, __pycache__, etc.
+  dummy-project-js         JavaScript project with .ilma.conf
+  dummy-project-rust       Rust project with Cargo.toml
+  dummy-project-latex      LaTeX project with build artifacts
+  dummy-project-recursive  Project configured for backup recursion testing
+  dummy-project-large      Large project for performance testing
+EOF
+    exit 0
+fi
+
 # Default target directory
 TARGET_DIR="${1:-/tmp/dummy-root}"
 
