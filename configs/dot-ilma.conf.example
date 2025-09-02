@@ -1,0 +1,121 @@
+# .ilma.conf.example - Comprehensive project configuration template
+# Copy to .ilma.conf in your project root and customize as needed
+# All variables are optional - defaults come from global config.ini
+
+# =============================================================================
+# PROJECT TYPE INHERITANCE
+# =============================================================================
+
+# Inherit settings from a project type config (python, node, latex, bash, etc.)
+# This loads configs/TYPE-project.ilma.conf first, then applies overrides below
+#PROJECT_TYPE="bash"
+
+# ARRAY OVERRIDE PATTERNS:
+# - THING=()           -> Zero/clear inherited arrays, start fresh
+# - THING+=(new stuff) -> Append to inherited arrays  
+# - THING=""           -> Disable feature entirely
+#
+# Example: Override bash-project.ilma.conf excludes with your own:
+# RSYNC_EXCLUDES=()                    # Clear bash defaults
+# RSYNC_EXCLUDES+=(                    # Add only your excludes
+#     --exclude 'cluster-jobs/'
+#     --exclude 'slurm-*.out'
+# )
+
+# =============================================================================
+# EXCLUSIONS (what NOT to backup/mirror)
+# =============================================================================
+
+# Main exclusion list for rsync operations
+RSYNC_EXCLUDES=(
+#    --exclude 'node_modules/'
+#    #--exclude '.git/'
+#    --exclude '*.log'
+#    --exclude 'build/'
+#    --exclude 'dist/'
+#    --exclude '.cache/'
+#    # Add more exclusions as needed
+)
+
+# =============================================================================
+# CONTEXT FILES (additional files to include in context mirror)
+# =============================================================================
+
+# Files to copy to context mirror even if not in main backup
+CONTEXT_FILES=(
+#   "AGENTS.md"
+#   "agents/STYLEGUIDE.md"
+#    # Add more context files as needed
+)
+
+# =============================================================================
+# STATISTICS SCOPE (for 'ilma console' command only)
+# =============================================================================
+
+# File extensions to analyze for project statistics
+# NOTE: This ONLY affects console output, NOT what gets backed up
+EXTENSIONS=(
+     md
+#    js ts tsx jsx
+#    py
+#    md txt
+#    json yaml yml
+#    sh bash
+    # Add more extensions for better console statistics
+)
+
+# =============================================================================
+# DESTINATION CONFIGURATION - All backup/archive/sync targets
+# =============================================================================
+
+# Base directories for backup operations (leave empty to NOT create mirror type)
+#BACKUP_BASE_DIR="."                    # Where to create .bak directories
+#ARCHIVE_BASE_DIR=""                    # Where to create compressed archives (empty = use parent dir)
+#CONTEXT_BASE_DIR=""                    # Where to create context mirrors (empty = nest in backup)
+
+# Archive creation settings
+#CREATE_COMPRESSED_ARCHIVE=true         # Create compressed archive after backup
+#MAX_ARCHIVES=5                         # Maximum number of archives to keep
+
+# XDG directory backup (config, cache, local data)
+#BACKUP_XDG_DIRS=false                  # Include ~/.config, ~/.local/share, ~/.cache
+#XDG_PATHS=("$HOME/.config" "$HOME/.local/share" "$HOME/.cache")
+
+# =============================================================================
+# COMPRESSION SETTINGS (override global config.ini)
+# =============================================================================
+
+# Compression algorithm: zstd, gzip, bzip2, xz, lzma, none
+#COMPRESSION_TYPE="zstd"                # Override global compression algorithm for this project
+#COMPRESSION_LEVEL="3"                  # Override global compression level for this project
+
+# =============================================================================
+# ENCRYPTION (GPG) - override global config.ini
+# =============================================================================
+
+# GPG encryption settings (leave empty to disable for this project)
+#GPG_KEY_ID=""                          # Override global GPG key ID for this project
+#GPG_OUTPUT_EXTENSION=".gpg"            # Override global encrypted file extension
+
+# =============================================================================
+# REMOTE SYNC (RSYNC) - override global config.ini  
+# =============================================================================
+
+# Remote synchronization settings (leave empty to disable for this project)
+#REMOTE_SERVER=""                       # Override global remote server for this project
+#REMOTE_PATH=""                         # Override global remote path for this project
+#CLEANUP_AFTER_TRANSFER="false"         # Override global cleanup behavior for this project
+
+# =============================================================================
+# INTEGRITY VERIFICATION - override global config.ini
+# =============================================================================
+
+# Hash algorithm for integrity checking: sha256, sha1, md5
+#HASH_ALGORITHM="sha256"                # Override global hash algorithm for this project
+
+# =============================================================================
+# TREE GENERATION
+# =============================================================================
+
+# Pattern for excluding items from TREE.txt generation (pipe-separated regex)
+#TREE_EXCLUDES="node_modules|\.git|build|dist|\.cache"
