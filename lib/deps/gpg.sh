@@ -1,5 +1,5 @@
 #!/bin/bash
-# lib/gpg.sh - GPG encryption and decryption functions
+# lib/deps/gpg.sh - GPG encryption and decryption functions
 
 # Generic file encryption function
 encrypt_file() {

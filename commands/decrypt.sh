@@ -1,5 +1,5 @@
 #!/bin/bash
-# lib/decrypt.sh - Decrypt and extract operations
+# commands/decrypt.sh - Decrypt and extract operations
 
 ILMA_DIR="$(dirname "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")")"
 
@@ -21,8 +21,8 @@ do_decrypt() {
     fi
 
     # Source required libraries
-    source "$ILMA_DIR/lib/gpg.sh"
-    source "$ILMA_DIR/lib/compression.sh"
+    source "$ILMA_DIR/lib/deps/gpg.sh"
+    source "$ILMA_DIR/lib/deps/compression.sh"
 
     # Decrypt first
     local output_file="${input_file%.gpg}"
@@ -137,7 +137,7 @@ do_extract() {
         return 1
     fi
 
-    source "$ILMA_DIR/lib/compression.sh"
+    source "$ILMA_DIR/lib/deps/compression.sh"
 
     if ! is_archive "$archive_file"; then
         echo "Error: File is not a recognized archive: $archive_file" >&2

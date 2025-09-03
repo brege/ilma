@@ -1,5 +1,5 @@
 #!/bin/bash
-# lib/prune.sh - Simple prune functionality using scan.sh
+# commands/prune.sh - Simple prune functionality using scan.sh
 
 ILMA_DIR="$(dirname "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")")"
 
@@ -10,8 +10,8 @@ Usage: ilma prune [OPTIONS] [PROJECT_PATH]
 Analyze and optionally remove junk files from projects based on project type configuration.
 
 OPTIONS:
-  --type TYPE      Project type configuration to use (default: minimal)
-                   Available types: default, minimal, bash, latex, node, python
+  --type TYPE      Project type configuration to use
+                   Available types: bash, latex, node, python
   --verbose        Show detailed analysis with file paths and context
   --bak            Create complete backup before deleting files
   --delete         Delete junk files without creating backup (DANGEROUS)
@@ -55,7 +55,7 @@ do_prune() {
 
     if [[ "$delete_mode" == "true" ]]; then
         # Delete mode: just do it, no previews or warnings
-        mapfile -t files < <("$ILMA_DIR/lib/scan.sh" --type "$type" "$project_root")
+        mapfile -t files < <("$ILMA_DIR/commands/scan.sh" --type "$type" "$project_root")
         if (( ${#files[@]} == 0 )); then
             echo "No junk files found - project appears clean!"
             return 0
@@ -88,10 +88,10 @@ do_prune() {
         echo "Operation logged to: $log_file"
     elif [[ "$verbose" == "true" ]]; then
         # Verbose dry-run: show detailed analysis
-        "$ILMA_DIR/lib/scan.sh" --type "$type" --pretty "$project_root"
+        "$ILMA_DIR/commands/scan.sh" --type "$type" --pretty "$project_root"
     else
         # Default dry-run: show summary and preview
-        mapfile -t files < <("$ILMA_DIR/lib/scan.sh" --type "$type" "$project_root")
+        mapfile -t files < <("$ILMA_DIR/commands/scan.sh" --type "$type" "$project_root")
         if (( ${#files[@]} == 0 )); then
             echo "No junk files found - project appears clean!"
             return 0

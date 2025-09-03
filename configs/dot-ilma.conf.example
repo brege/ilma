@@ -68,10 +68,17 @@ EXTENSIONS=(
 # DESTINATION CONFIGURATION - All backup/archive/sync targets
 # =============================================================================
 
-# Base directories for backup operations (leave empty to NOT create mirror type)
-#BACKUP_BASE_DIR="."                    # Where to create .bak directories
-#ARCHIVE_BASE_DIR=""                    # Where to create compressed archives (empty = use parent dir)
-#CONTEXT_BASE_DIR=""                    # Where to create context mirrors (empty = nest in backup)
+# Base directories for backup operations
+# Directory resolution for backup/archive/context operations:
+# <unset/empty> = sibling to target (DEFAULT): ilma dummy/ → dummy.bak, dummy.tar.zst, dummy.context
+# ".."          = same as default (sibling): ilma dummy/ → dummy.bak, dummy.tar.zst, dummy.context  
+# "."           = inside target: ilma dummy/ → dummy/dummy.bak, dummy/dummy.context
+# "."           = ERROR for archive_base_dir (archives inside targets don't make sense)
+# "/abs/path"   = absolute path: ilma dummy/ → /abs/path/dummy.bak
+# "rel/path"    = relative to target: ilma dummy/ → dummy/rel/path/dummy.bak
+#BACKUP_BASE_DIR=""                     # Where to create .bak directories
+#ARCHIVE_BASE_DIR=""                    # Where to create compressed archives  
+#CONTEXT_BASE_DIR=""                    # Where to create context mirrors
 
 # Archive creation settings
 #CREATE_COMPRESSED_ARCHIVE=true         # Create compressed archive after backup

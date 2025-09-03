@@ -1,12 +1,34 @@
 #!/bin/bash
-# lib/backup.sh - Main backup functionality for ilma
+# commands/backup.sh - Main backup functionality for ilma
 
 # Source required functions
 ILMA_DIR="$(dirname "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")")"
 source "$ILMA_DIR/lib/functions.sh"
-source "$ILMA_DIR/lib/compression.sh"
-source "$ILMA_DIR/lib/rsync.sh"
-source "$ILMA_DIR/lib/gpg.sh"
+source "$ILMA_DIR/lib/deps/compression.sh"
+source "$ILMA_DIR/lib/deps/rsync.sh"
+source "$ILMA_DIR/lib/deps/gpg.sh"
+
+# Unified path resolution for *_base_dir settings
+resolve_base_dir() {
+    local base_dir="$1"
+    local project_root="$2"
+    local project_name="$3"
+    local suffix="$4"
+    
+    if [[ -z "$base_dir" || "$base_dir" == ".." ]]; then
+        # Default: sibling to project
+        echo "$(dirname "$project_root")/${project_name}${suffix}"
+    elif [[ "$base_dir" == "." ]]; then
+        # Inside target directory
+        echo "$project_root/${project_name}${suffix}"
+    elif [[ "$base_dir" == /* ]]; then
+        # Absolute path
+        echo "${base_dir/#\~/$HOME}/${project_name}${suffix}"
+    else
+        # Relative path - relative to project directory
+        echo "$project_root/$base_dir/${project_name}${suffix}"
+    fi
+}
 
 # Main backup function
 do_backup() {
@@ -20,35 +42,21 @@ do_backup() {
     # Configuration should be loaded before calling this function
     # Variables expected: BACKUP_BASE_DIR, CONFIG_FOUND, etc.
 
-    # Configuration - resolve backup and context directories relative to project
-    if [[ "${BACKUP_BASE_DIR}" == /* ]]; then
-        # Absolute path
-        resolved_backup_dir="${BACKUP_BASE_DIR/#\~/$HOME}"
-    else
-        # Relative path - resolve relative to project directory
-        resolved_backup_dir="$project_root/$BACKUP_BASE_DIR"
-    fi
-    MAIN_BACKUP_DIR="$resolved_backup_dir/${project_name}.bak"
+    # Resolve backup directory path
+    MAIN_BACKUP_DIR=$(resolve_base_dir "$BACKUP_BASE_DIR" "$project_root" "$project_name" ".bak")
 
     # Set context mirror location
     if [[ -n "$CONTEXT_BASE_DIR" ]]; then
-        if [[ "${CONTEXT_BASE_DIR}" == /* ]]; then
-            # Absolute path
-            resolved_context_dir="${CONTEXT_BASE_DIR/#\~/$HOME}"
-        else
-            # Relative path - resolve relative to project directory
-            resolved_context_dir="$project_root/$CONTEXT_BASE_DIR"
-        fi
-        MIRROR_DIR="$resolved_context_dir/$project_name"
-        MIRROR_DIR_BASENAME="$project_name"  # Still need this for exclusions
+        MIRROR_DIR=$(resolve_base_dir "$CONTEXT_BASE_DIR" "$project_root" "$project_name" ".context")
+        MIRROR_DIR_BASENAME="$(basename "$MIRROR_DIR")"
     else
         # Default: nested in backup directory
-        MIRROR_DIR_BASENAME="$project_name"
+        MIRROR_DIR_BASENAME="${project_name}.context"
         MIRROR_DIR="$MAIN_BACKUP_DIR/$MIRROR_DIR_BASENAME"
     fi
 
-    # Skip backup and context steps in fallback mode
-    if [[ "$CONFIG_FOUND" == "true" ]]; then
+    # Always create backup directory
+    {
         # --- Step 1: Main Full Backup ---
         echo "Step 1: Creating main full backup at '$MAIN_BACKUP_DIR'..."
         mkdir -p "$MAIN_BACKUP_DIR"
@@ -65,7 +73,7 @@ do_backup() {
              "${BACKUP_EXCLUDES[@]}" \
              "$project_root/" "$MAIN_BACKUP_DIR/"
         echo "Main backup complete."
-    fi
+    }
 
     # Only do XDG backup, context mirror, and stats in configured mode
     if [[ "$CONFIG_FOUND" == "true" ]]; then
@@ -259,8 +267,8 @@ Arguments:
   --archive       Create compressed archive after backup
 
 Examples:
-  ./lib/backup.sh /path/to/project
-  ./lib/backup.sh . --archive
+  ./commands/backup.sh /path/to/project
+  ./commands/backup.sh . --archive
 
 This tool uses the same configuration system as the main ilma command.
 EOF
@@ -272,7 +280,7 @@ EOF
     ARCHIVE_FLAG="${2:-}"
 
     # Load configuration first
-    source "$ILMA_DIR/lib/config.sh"
+    source "$ILMA_DIR/commands/config.sh"
     load_config "$PROJECT_ROOT"
     handle_special_modes "$ARCHIVE_FLAG" "$PROJECT_ROOT"
 

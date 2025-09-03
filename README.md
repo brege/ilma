@@ -83,8 +83,8 @@ sudo apt install zstd gzip bzip2 xz-utils
 
 Validate dependencies
 ```bash
-./lib/deps.sh check
-./lib/deps.sh install-help
+./lib/deps/deps.sh check
+./lib/deps/deps.sh install-help
 ```
 
 Add the **ilma** to your `$PATH`
