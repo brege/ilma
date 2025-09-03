@@ -77,8 +77,6 @@ load_config() {
         load_ini_config "$ILMA_DIR/config.ini"
     fi
 
-    # Legacy configs removed - all defaults now in config.ini
-
     # Load type-specific config if specified (for archive creation only)
     TYPE_CONFIG_LOADED=false
     if [[ -n "$type" ]]; then
@@ -96,31 +94,28 @@ load_config() {
 
     # Load project-local configuration (enables full pipeline)
     CONFIG_FOUND=false
-    for config_file in ".ilma.conf" ".archive.conf" ".backup.conf"; do
-        if [[ -f "$project_root/$config_file" ]]; then
-            # First pass: check if PROJECT_TYPE is specified
-            PROJECT_TYPE=""
-            source "$project_root/$config_file"
+    if [[ -f "$project_root/.ilma.conf" ]]; then
+        # First pass: check if PROJECT_TYPE is specified
+        PROJECT_TYPE=""
+        source "$project_root/.ilma.conf"
 
-            # If PROJECT_TYPE is set, load that type config first
-            if [[ -n "$PROJECT_TYPE" ]]; then
-                local type_config="$ILMA_DIR/configs/${PROJECT_TYPE}-project.ilma.conf"
-                if [[ -f "$type_config" ]]; then
-                    source "$type_config"
-                elif [[ -f "$ILMA_DIR/configs/${PROJECT_TYPE}.ilma.conf" ]]; then
-                    source "$ILMA_DIR/configs/${PROJECT_TYPE}.ilma.conf"
-                else
-                    echo "Warning: PROJECT_TYPE '$PROJECT_TYPE' not found in configs/" >&2
-                fi
-
-                # Second pass: re-source local config for overrides/appends
-                source "$project_root/$config_file"
+        # If PROJECT_TYPE is set, load that type config first
+        if [[ -n "$PROJECT_TYPE" ]]; then
+            local type_config="$ILMA_DIR/configs/${PROJECT_TYPE}-project.ilma.conf"
+            if [[ -f "$type_config" ]]; then
+                source "$type_config"
+            elif [[ -f "$ILMA_DIR/configs/${PROJECT_TYPE}.ilma.conf" ]]; then
+                source "$ILMA_DIR/configs/${PROJECT_TYPE}.ilma.conf"
+            else
+                echo "Warning: PROJECT_TYPE '$PROJECT_TYPE' not found in configs/" >&2
             fi
 
-            CONFIG_FOUND=true
-            break
+            # Second pass: re-source local config for overrides/appends
+            source "$project_root/.ilma.conf"
         fi
-    done
+
+        CONFIG_FOUND=true
+    fi
 }
 
 # Handle special modes (archive flag, fallback, etc.)
