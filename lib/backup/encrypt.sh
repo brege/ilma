@@ -14,8 +14,8 @@ create_encrypted_archive() {
     fi
 
     # Source required libraries
-    source "$ILMA_DIR/lib/compression.sh"
-    source "$ILMA_DIR/lib/gpg.sh"
+    source "$ILMA_DIR/lib/deps/compression.sh"
+    source "$ILMA_DIR/lib/deps/gpg.sh"
 
     # Create temporary archive first
     local temp_archive
@@ -74,7 +74,7 @@ encrypt_existing_file() {
         return 1
     fi
 
-    source "$ILMA_DIR/lib/gpg.sh"
+    source "$ILMA_DIR/lib/deps/gpg.sh"
 
     if [[ -z "$output_file" ]]; then
         output_file="${input_file}${GPG_OUTPUT_EXTENSION:-.gpg}"

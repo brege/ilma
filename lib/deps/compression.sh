@@ -1,5 +1,5 @@
 #!/bin/bash
-# lib/compression.sh - Compression utilities for archives
+# lib/deps/compression.sh - Compression utilities for archives
 
 get_compression_cmd() {
     local comp_type="$1"

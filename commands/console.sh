@@ -1,5 +1,5 @@
 #!/bin/bash
-# lib/console.sh - Console summary and analysis functionality for ilma
+# commands/console.sh - Console summary and analysis functionality for ilma
 
 # Source required functions
 ILMA_DIR="$(dirname "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")")"
@@ -283,8 +283,8 @@ Arguments:
   PROJECT_PATH    Path to project directory (default: current directory)
 
 Examples:
-  ./lib/console.sh /path/to/project
-  ./lib/console.sh .
+  ./commands/console.sh /path/to/project
+  ./commands/console.sh .
 
 Displays file counts, line counts, and size statistics organized by file extension.
 EOF
@@ -295,7 +295,7 @@ EOF
     PROJECT_ROOT="${1:-$(pwd)}"
 
     # Load configuration first
-    source "$ILMA_DIR/lib/config.sh"
+    source "$ILMA_DIR/commands/config.sh"
     load_config "$PROJECT_ROOT"
 
     # Show console summary

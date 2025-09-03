@@ -1,10 +1,10 @@
 #!/bin/bash
-# lib/validate.sh - Configuration validation and smoke testing for ilma
+# commands/validate.sh - Configuration validation and smoke testing for ilma
 
 # Source required libraries
 ILMA_DIR="$(dirname "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")")"
-source "$ILMA_DIR/lib/config.sh"
-source "$ILMA_DIR/lib/compression.sh"
+source "$ILMA_DIR/commands/config.sh"
+source "$ILMA_DIR/lib/deps/compression.sh"
 source "$ILMA_DIR/lib/functions.sh"
 
 # Colors for output
@@ -297,7 +297,7 @@ EOF
     validate_info "Created temporary test project at $test_project_dir"
 
     # Test configuration loading
-    if source "$ILMA_DIR/lib/config.sh" && load_config "$test_project_dir" ""; then
+    if source "$ILMA_DIR/commands/config.sh" && load_config "$test_project_dir" ""; then
         validate_pass "Configuration loading with test project"
     else
         validate_fail "Configuration loading" "Failed to load config for test project"
@@ -394,9 +394,9 @@ Arguments:
   PROJECT_PATH    Path to project directory for global config context (default: current directory)
 
 Examples:
-  ./lib/validate.sh basic /path/to/project     # Validate specific project
-  ./lib/validate.sh full .                     # Full validation with current dir context
-  ./lib/validate.sh smoke-test                 # Complete test using temporary dummy project
+  ./commands/validate.sh basic /path/to/project     # Validate specific project
+  ./commands/validate.sh full .                     # Full validation with current dir context
+  ./commands/validate.sh smoke-test                 # Complete test using temporary dummy project
 
 Note: smoke-test creates its own temporary test project regardless of PROJECT_PATH.
 

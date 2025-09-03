@@ -36,28 +36,28 @@ For the current scope, all of these utilities and functions are flattened in the
 **`backup.sh`**
 ```bash
 # backup a project
-./lib/backup.sh /path/to/project
+./commands/backup.sh /path/to/project
 
 # or w/ archive creation
-ARCHIVE_FLAG=--archive ./lib/backup.sh /path/to/project
+ARCHIVE_FLAG=--archive ./commands/backup.sh /path/to/project
 ```
 
 **`config.sh`**
 ```bash
 # test config loading
-./lib/config.sh /path/to/project
+./commands/config.sh /path/to/project
 
 # validate config/inheritance
-./lib/config.sh /path/to/project-with-ilma-conf
+./commands/config.sh /path/to/project-with-ilma-conf
 ```
 
 **`console.sh`**
 ```bash
 # project statistics
-./lib/console.sh /path/to/project
+./commands/console.sh /path/to/project
 
 # analyze current directory
-./lib/console.sh
+./commands/console.sh
 ```
 
 **`excludes.sh`**
@@ -73,10 +73,10 @@ echo "Skip dirs: ${SKIP_DIRS[@]}"
 **`scan.sh`**
 ```bash
 # Scan project for junk files
-./lib/scan.sh /path/to/project
+./commands/scan.sh /path/to/project
 
 # Scan with project type detection
-./lib/scan.sh /path/to/project --detect-type
+./commands/scan.sh /path/to/project --detect-type
 ```
 
 ## Function Libraries
@@ -86,7 +86,7 @@ echo "Skip dirs: ${SKIP_DIRS[@]}"
 #!/bin/bash
 # source required libraries
 ILMA_DIR="$(dirname "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")")"
-source "$ILMA_DIR/lib/compression.sh"
+source "$ILMA_DIR/lib/deps/compression.sh"
 source "$ILMA_DIR/lib/functions.sh"
 
 # use library functions
@@ -100,7 +100,7 @@ line_count=$(git-count-lines "/path/to/project" "*.py")
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     PROJECT_ROOT="${1:-$(pwd)}"
     
-    source "$ILMA_DIR/lib/config.sh"
+    source "$ILMA_DIR/commands/config.sh"
     load_config "$PROJECT_ROOT"
     
     # Tool-specific functionality here

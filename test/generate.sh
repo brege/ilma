@@ -20,7 +20,6 @@ Examples:
 Generated Projects:
   dummy-project-python     Python project with venv, __pycache__, etc.
   dummy-project-js         JavaScript project with .ilma.conf
-  dummy-project-rust       Rust project with Cargo.toml
   dummy-project-latex      LaTeX project with build artifacts
   dummy-project-recursive  Project configured for backup recursion testing
   dummy-project-large      Large project for performance testing
@@ -113,6 +112,7 @@ cat > "$JS_DIR/.ilma.conf" <<'EOF'
 # JS project configuration - archive, backup, context
 EXTENSIONS=(js json md css)
 BACKUP_XDG_DIRS=false
+# ABC directories relative to dummy-project-*/
 BACKUP_BASE_DIR="../backup"
 ARCHIVE_BASE_DIR="../archive"
 CONTEXT_BASE_DIR="../context"
@@ -131,36 +131,6 @@ RSYNC_EXCLUDES+=(
 CONTEXT_FILES=()
 
 TREE_EXCLUDES+="|node_modules|dist|build"
-EOF
-
-# --- Dummy Rust Project ---
-echo "  Creating dummy-project-rust..."
-RUST_DIR="$TARGET_DIR/dummy-project-rust"
-mkdir -p "$RUST_DIR/src"
-
-cat > "$RUST_DIR/Cargo.toml" <<'EOF'
-[package]
-name = "dummy-project-rust"
-version = "0.1.0"
-edition = "2021"
-
-[dependencies]
-clap = "4.0"
-serde = { version = "1.0", features = ["derive"] }
-EOF
-
-cat > "$RUST_DIR/src/main.rs" <<'EOF'
-fn main() {
-    println!("Hello from dummy Rust project!");
-}
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
-    }
-}
 EOF
 
 # --- Dummy LaTeX Project ---
@@ -304,7 +274,6 @@ echo
 echo "Projects created:"
 echo "  • dummy-project-python    - Simple Python project (no config)"
 echo "  • dummy-project-js        - JavaScript/Node project (with .ilma.conf)"
-echo "  • dummy-project-rust      - Rust project (no config)"
 echo "  • dummy-project-latex     - LaTeX project with build artifacts"
 echo "  • dummy-project-recursive - Project with backup recursion risk"
 echo "  • dummy-project-large     - Large project for console testing"

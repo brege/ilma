@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# lib/scan.sh - General-purpose dry-run skip printer with LaTeX-style project detection
+# commands/scan.sh - General-purpose dry-run skip printer with LaTeX-style project detection
 
 set -euo pipefail
 
@@ -10,8 +10,8 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 RESET='\033[0m'
 
-SCRIPT_DIR="$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")"
-EXAMPLES_DIR="$SCRIPT_DIR/../configs"
+ILMA_DIR="$(dirname "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")")"
+EXAMPLES_DIR="$ILMA_DIR/configs"
 
 # Find all .ilma.conf files
 mapfile -t config_files < <(find "$EXAMPLES_DIR" -maxdepth 1 -type f -name '*.ilma.conf' | sort)
@@ -28,7 +28,7 @@ for cf in "${config_files[@]}"; do
     types_map["$short_name"]="$cf"
 done
 
-DEFAULT_TYPE="minimal"
+DEFAULT_TYPE=""
 TYPE="$DEFAULT_TYPE"
 DIR="."
 PRETTY_OUTPUT=false
@@ -37,7 +37,7 @@ usage() {
     cat <<EOF
 Usage: $0 [--type TYPE] [--pretty] [directory]
 
-  --type TYPE     Project type to use (default: $DEFAULT_TYPE)
+  --type TYPE     Project type to use (required)
                   Supported types: ${!types_map[*]}
   --pretty        Human-friendly output with colors and headers
   directory       Directory to scan for projects (default: current dir)
@@ -78,7 +78,11 @@ while (( $# )); do
     esac
 done
 
-if [[ -z "${types_map[$TYPE]:-}" ]]; then
+if [[ -z "$TYPE" ]]; then
+    echo -e "${RED}Error:${RESET} --type is required"
+    echo "Supported types: ${!types_map[*]}"
+    exit 1
+elif [[ -z "${types_map[$TYPE]:-}" ]]; then
     echo -e "${RED}Error:${RESET} Unsupported type '$TYPE'"
     echo "Supported types: ${!types_map[*]}"
     exit 1

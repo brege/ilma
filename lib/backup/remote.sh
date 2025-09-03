@@ -17,7 +17,7 @@ sync_to_remote() {
     echo "Syncing to remote: $remote_target"
 
     # Source rsync utilities
-    source "$ILMA_DIR/lib/rsync.sh"
+    source "$ILMA_DIR/lib/deps/rsync.sh"
 
     # Build rsync command
     local rsync_args=(

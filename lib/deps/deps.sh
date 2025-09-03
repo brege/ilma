@@ -1,5 +1,5 @@
 #!/bin/bash
-# lib/deps.sh - Dependency checker and analyzer for ilma
+# lib/deps/deps.sh - Dependency checker and analyzer for ilma
 
 # Source required functions
 ILMA_DIR="$(dirname "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")")"
@@ -368,9 +368,9 @@ Modes:
   install-help Show installation commands for missing dependencies
 
 Examples:
-  ./lib/deps.sh                    # Check all dependencies
-  ./lib/deps.sh report             # Generate README-ready dependency list
-  ./lib/deps.sh install-help       # Show how to install missing dependencies
+  ./lib/deps/deps.sh                    # Check all dependencies
+  ./lib/deps/deps.sh report             # Generate README-ready dependency list
+  ./lib/deps/deps.sh install-help       # Show how to install missing dependencies
 
 Exit codes:
   0 - All required dependencies available

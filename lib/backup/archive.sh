@@ -1,6 +1,29 @@
 #!/bin/bash
 # lib/backup/archive.sh - Archive-only operations
 
+# Unified path resolution for *_base_dir settings
+resolve_base_dir() {
+    local base_dir="$1"
+    local project_root="$2"
+    local project_name="$3"
+    local suffix="$4"
+
+    if [[ -z "$base_dir" || "$base_dir" == ".." ]]; then
+        # Default: sibling to project
+        echo "$(dirname "$project_root")/${project_name}${suffix}"
+    elif [[ "$base_dir" == "." ]]; then
+        # Inside target directory - ERROR for archives
+        echo "ERROR: archive_base_dir cannot be '.' (archives inside targets not supported)" >&2
+        return 1
+    elif [[ "$base_dir" == /* ]]; then
+        # Absolute path
+        echo "${base_dir/#\~/$HOME}/${project_name}${suffix}"
+    else
+        # Relative path - relative to project directory
+        echo "$project_root/$base_dir/${project_name}${suffix}"
+    fi
+}
+
 # Archive creation without full backup
 create_archive_only() {
     local project_root="$1"
@@ -17,7 +40,7 @@ create_archive_only() {
     echo "Creating archive: $output_path"
 
     # Source compression utilities
-    source "$ILMA_DIR/lib/compression.sh"
+    source "$ILMA_DIR/lib/deps/compression.sh"
 
     # Build tar command with exclusions
     local tar_args=("--create")
@@ -39,12 +62,6 @@ create_archive_only() {
     if tar "${tar_args[@]}"; then
         echo "Archive created: $output_path"
 
-        # Generate hash if configured
-        if [[ -n "$HASH_ALGORITHM" ]]; then
-            local hash_file="${output_path}.${HASH_ALGORITHM}"
-            ${HASH_ALGORITHM}sum "$output_path" > "$hash_file"
-            echo "Hash file created: $hash_file"
-        fi
 
         return 0
     else

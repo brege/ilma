@@ -1,5 +1,5 @@
 #!/bin/bash
-# lib/config.sh - Configuration loading and management for ilma
+# commands/config.sh - Configuration loading and management for ilma
 
 # Load INI configuration file
 load_ini_config() {
@@ -51,7 +51,7 @@ load_config() {
     local type="${2:-}"
 
     # Set default configuration variables
-    BACKUP_BASE_DIR="."
+    BACKUP_BASE_DIR=""
     ARCHIVE_BASE_DIR=""
     CONTEXT_BASE_DIR=""
     CREATE_COMPRESSED_ARCHIVE=false
@@ -246,9 +246,9 @@ Arguments:
   TYPE            Project type for --type flag simulation
 
 Examples:
-  ./lib/config.sh /path/to/project
-  ./lib/config.sh . python
-  ./lib/config.sh /path/to/project bash
+  ./commands/config.sh /path/to/project
+  ./commands/config.sh . python
+  ./commands/config.sh /path/to/project bash
 
 Shows resolved configuration including PROJECT_TYPE inheritance and all settings.
 EOF

@@ -1,5 +1,5 @@
 #!/bin/bash
-# lib/rsync.sh - Remote synchronization functions
+# lib/deps/rsync.sh - Remote synchronization functions
 
 # Compute file hash
 compute_hash() {
