@@ -11,10 +11,10 @@ BLUE='\033[0;34m'
 RESET='\033[0m'
 
 ILMA_DIR="$(dirname "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")")"
-EXAMPLES_DIR="$ILMA_DIR/configs"
+CONF_DIR="$ILMA_DIR/configs"
 
 # Find all .ilma.conf files
-mapfile -t config_files < <(find "$EXAMPLES_DIR" -maxdepth 1 -type f -name '*.ilma.conf' | sort)
+mapfile -t config_files < <(find "$CONF_DIR" -maxdepth 1 -type f -name '*.ilma.conf' | sort)
 
 declare -A types_map=()
 for cf in "${config_files[@]}"; do

@@ -23,7 +23,6 @@ fi
 
 # Check backup directory
 if [[ -n "$BACKUP_BASE_DIR" ]]; then
-    local backup_dir
     if [[ "$BACKUP_BASE_DIR" == "." ]]; then
         backup_dir="$PROJECT_ROOT"
     else

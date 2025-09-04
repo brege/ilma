@@ -10,12 +10,12 @@ Usage: generate.sh [TARGET_DIR]
 
 Generate dummy project structures for testing ilma functionality.
 
-Arguments:
+ARGUMENTS:
   TARGET_DIR    Directory where test projects will be created (default: /tmp/dummy-root)
 
-Examples:
-  ./test/generate.sh                    # Creates projects in /tmp/dummy-root
-  ./test/generate.sh /tmp/my-tests      # Creates projects in /tmp/my-tests
+EXAMPLES:
+  ./test/generate.sh                  # Creates projects in /tmp/dummy-root
+  ./test/generate.sh /tmp/my-tests    # Creates projects in /tmp/my-tests
 
 Generated Projects:
   dummy-project-python     Python project with venv, __pycache__, etc.
