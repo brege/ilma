@@ -36,20 +36,26 @@ COMMANDS:
   decrypt                              Decrypt GPG-encrypted archive
   extract                              Safely extract archive (prevents tarbombs)
 
-OPTIONS:
+BACKUP OPTIONS:
   --backup [OUTPUT_PATH]               Create backup directory (explicit)
   --archive [OUTPUT_PATH]              Create compressed archive only
   --encrypt [OUTPUT_PATH]              Create encrypted archive only  
   --context [OUTPUT_PATH]              Create context mirror only
   --remote SERVER:/PATH                Sync directly to remote server
+
+SCAN/PRUNE OPTIONS:
   --type TYPE                          Use project type configuration
-  --pretty                             Show detailed output (for scan command)
-  --verbose                            Show detailed output (for prune command)
-  --bak                                Create backup then delete junk files (for prune command)
-  --delete                             Delete junk files without backup (for prune command)
-  --no-extract                         Decrypt only, do not extract archive (for decrypt command)
-  --force                              Replace existing directories (for decrypt/extract commands)
-  --outdir DIR                         Extract to specific directory (for decrypt/extract commands)
+  --pretty                             Show detailed output
+  --verbose                            Show detailed output
+  --bak                                Create backup then delete junk files
+  --delete                             Delete junk files without backup
+
+DECRYPT/EXTRACT OPTIONS:
+  --no-extract                         Decrypt only, do not extract archive
+  --force                              Replace existing directories
+  --outdir DIR                         Extract to specific directory
+
+GLOBAL OPTIONS:
   -h, --help                           Show this help
 
 PROJECT TYPES:
@@ -103,38 +109,11 @@ if [[ "$HELP_REQUESTED" == "true" && -n "$HELP_COMMAND" ]]; then
             exit 0
             ;;
         validate)
-            cat <<EOF
-Usage: ilma validate [LEVEL] [PROJECT_PATH]
-
-Validate configuration and connectivity for ilma setup.
-
-LEVELS:
-  basic       Basic configuration and path validation (default)
-  full        Include remote connectivity tests  
-  smoke-test  Full validation plus end-to-end test with generated dummy project
-
-Examples:
-  ilma validate                         # Basic validation of current directory
-  ilma validate full /path/to/project   # Full validation of specific project  
-  ilma validate smoke-test              # Complete test using temporary dummy project
-
-Note: smoke-test creates its own temporary test project for validation.
-
-Exit codes:
-  0 - All checks passed (warnings allowed)
-  1 - Validation failed with errors
-EOF
+            "$ILMA_DIR/commands/validate.sh" --help
             exit 0
             ;;
         backup)
-            cat <<EOF
-Usage: ilma backup [OPTIONS] [PROJECT_PATH]
-
-Create backup and context mirror of a project (default command).
-
-This is the same as running 'ilma' without any command.
-For full help, run: ilma --help
-EOF
+            "$ILMA_DIR/commands/backup.sh" --help
             exit 0
             ;;
         extract)

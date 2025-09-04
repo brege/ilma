@@ -17,7 +17,6 @@ config_found=false
 if [[ -f "$PROJECT_ROOT/.ilma.conf" ]]; then
     config_found=true
     echo "PASS:Configuration file found"
-    break
 fi
 
 if [[ "$config_found" == false ]]; then

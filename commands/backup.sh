@@ -14,7 +14,7 @@ resolve_base_dir() {
     local project_root="$2"
     local project_name="$3"
     local suffix="$4"
-    
+
     if [[ -z "$base_dir" || "$base_dir" == ".." ]]; then
         # Default: sibling to project
         echo "$(dirname "$project_root")/${project_name}${suffix}"
@@ -258,17 +258,24 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     # Handle help flag
     if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
         cat << 'EOF'
-Usage: backup.sh [PROJECT_PATH] [--archive]
+Usage: backup.sh [OPTIONS] [PROJECT_PATH]
 
-Standalone backup tool - creates backup and context mirror for a project.
+Create backup and context mirror of a project (default ilma behavior).
 
-Arguments:
+OPTIONS:
+  --backup [OUTPUT_PATH]               Create backup directory (explicit)
+  --archive [OUTPUT_PATH]              Create compressed archive only
+  --encrypt [OUTPUT_PATH]              Create encrypted archive only
+  --context [OUTPUT_PATH]              Create context mirror only
+  --remote SERVER:/PATH                Sync directly to remote server
+
+ARGUMENTS:
   PROJECT_PATH    Path to project directory (default: current directory)
-  --archive       Create compressed archive after backup
 
 Examples:
   ./commands/backup.sh /path/to/project
-  ./commands/backup.sh . --archive
+  ./commands/backup.sh --archive /path/to/project
+  ./commands/backup.sh --encrypt --remote srv:/backup
 
 This tool uses the same configuration system as the main ilma command.
 EOF

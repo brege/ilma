@@ -18,7 +18,7 @@ Usage: ilma validate [OPTIONS] [PROJECT_PATH]
 Validate ilma system components and configuration.
 
 OPTIONS:
-  --dependencies   Validate all system dependencies
+  --dependencies  Validate all system dependencies
   --gpg           Validate GPG configuration and keys
   --compression   Validate compression tools
   --config        Validate basic configuration
