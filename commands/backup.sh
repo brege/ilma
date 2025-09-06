@@ -33,7 +33,7 @@ resolve_base_dir() {
 # Generate unique backup directory name with timestamp/numbering
 resolve_backup_dir_with_deduplication() {
     local base_path="$1"
-    local naming_strategy="${BACKUP_NAMING_STRATEGY:-timestamp}"
+    local naming_strategy="${VERSIONING:-timestamp}"
 
     # If directory doesn't exist, use it as-is
     if [[ ! -d "$base_path" ]]; then
