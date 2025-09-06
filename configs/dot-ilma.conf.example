@@ -84,8 +84,8 @@ EXTENSIONS=(
 #CREATE_COMPRESSED_ARCHIVE=true         # Create compressed archive after backup
 #MAX_ARCHIVES=5                         # Maximum number of archives to keep
 
-# Backup naming strategy for duplicate handling
-#BACKUP_NAMING_STRATEGY="timestamp"     # How to handle duplicate backup directories
+# Backup duplicate handling
+#VERSIONING="timestamp"                 # How to handle duplicate backup directories
                                         # Options: "timestamp", "numbered", "overwrite"
                                         # timestamp: project-20250101-123456.bak
                                         # numbered:  project.1.bak, project.2.bak

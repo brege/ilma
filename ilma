@@ -224,11 +224,35 @@ if [[ "$COMMAND" == "validate" ]]; then
     done
 else
     # Expand combined short flags (-abc becomes -a -b -c, but -r combinations not supported)
+    # Also expand single short flags like -e to --encrypt
     if [[ "$COMMAND" == "backup" ]]; then
-        expanded_args=($(expand_combined_flags "$@"))
-        if [[ $? -ne 0 ]]; then
-            exit 1  # Error message already printed by expand_combined_flags
-        fi
+        expanded_args=()
+        for arg in "$@"; do
+            case "$arg" in
+                -a) expanded_args+=(--archive) ;;
+                -b) expanded_args+=(--backup) ;;
+                -c) expanded_args+=(--context) ;;
+                -e) expanded_args+=(--encrypt) ;;
+                -r) expanded_args+=(--remote) ;;
+                -*) 
+                    # Handle combined flags
+                    if [[ "$arg" =~ ^-[abce]{2,}$ ]]; then
+                        local flag_chars="${arg#-}"
+                        for ((i=0; i<${#flag_chars}; i++)); do
+                            case "${flag_chars:i:1}" in
+                                a) expanded_args+=(--archive) ;;
+                                b) expanded_args+=(--backup) ;;
+                                c) expanded_args+=(--context) ;;
+                                e) expanded_args+=(--encrypt) ;;
+                            esac
+                        done
+                    else
+                        expanded_args+=("$arg")
+                    fi
+                    ;;
+                *) expanded_args+=("$arg") ;;
+            esac
+        done
         set -- "${expanded_args[@]}"
     fi
     while (( $# > 0 )); do
@@ -352,10 +376,16 @@ if [[ -z "$PROJECT_ROOT" ]]; then
     PROJECT_ROOT="$(pwd)"
 fi
 
-# Validate project directory (except for decrypt/extract/validate commands which handle their own validation)
+# Detect if PROJECT_ROOT is a file or directory
+IS_SINGLE_FILE=false
 if [[ "$COMMAND" != "decrypt" && "$COMMAND" != "extract" && "$COMMAND" != "validate" ]]; then
-    if [[ ! -d "$PROJECT_ROOT" ]]; then
-        echo "Error: Directory does not exist: $PROJECT_ROOT"
+    if [[ -f "$PROJECT_ROOT" ]]; then
+        IS_SINGLE_FILE=true
+        SINGLE_FILE_PATH="$PROJECT_ROOT"
+        PROJECT_ROOT="$(dirname "$PROJECT_ROOT")"
+        echo "Single file mode: $(basename "$SINGLE_FILE_PATH")"
+    elif [[ ! -d "$PROJECT_ROOT" ]]; then
+        echo "Error: Directory or file does not exist: $PROJECT_ROOT"
         exit 1
     fi
 fi
@@ -379,6 +409,25 @@ case "$COMMAND" in
         # Load config for all backup modes
         source "$ILMA_DIR/commands/config.sh"
         load_config "$PROJECT_ROOT" "$TYPE"
+        
+        # Handle single file operations first
+        if [[ "$IS_SINGLE_FILE" == "true" ]]; then
+            source "$ILMA_DIR/lib/singles.sh"
+            
+            # Single file encryption: ilma -e file.txt -> file.txt.gpg
+            if [[ "$ENCRYPT_FLAG" == "true" || -n "$ENCRYPT_FLAG" ]]; then
+                if [[ -z "$GPG_KEY_ID" ]]; then
+                    echo "Error: GPG key not configured. Set GPG_KEY_ID in config."
+                    exit 1
+                fi
+                do_single_file_encryption "$SINGLE_FILE_PATH"
+                exit 0
+            fi
+            
+            # Default single file backup: ilma file.txt -> file.txt.bak
+            do_single_file_backup "$SINGLE_FILE_PATH"
+            exit 0
+        fi
         
         # Handle multiple backup operations (no longer mutually exclusive)
         OPERATIONS_PERFORMED=false
