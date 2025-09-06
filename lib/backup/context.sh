@@ -45,7 +45,6 @@ create_context_only() {
         "--archive"
         "--delete"
         "--human-readable"
-        "--itemize-changes"
     )
 
     # Add context file patterns as includes (if any)
@@ -91,8 +90,6 @@ create_context_only() {
     # Add source and destination
     rsync_args+=("$project_root/")
     rsync_args+=("$output_path/")
-
-    echo "Running: rsync ${rsync_args[*]}"
 
     if rsync "${rsync_args[@]}"; then
         echo "Context mirror created: $output_path"

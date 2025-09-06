@@ -193,16 +193,21 @@ for arg in "$@"; do
     esac
 done
 
-# Expand combined short flags (e.g., -ar becomes -a -r)
+# Expand combined short flags (e.g., -abc becomes -a -b -c)
+# Special handling: -r requires an argument, so combinations with -r are not supported
 expand_combined_flags() {
     local expanded_args=()
     for arg in "$@"; do
-        if [[ "$arg" =~ ^-[abcer]{2,}$ ]]; then
-            # This is a combined short flag like -ar or -aer
+        if [[ "$arg" =~ ^-[abce]{2,}$ ]]; then
+            # This is a combined short flag WITHOUT -r (which requires an argument)
             local flag_chars="${arg#-}"
             for ((i=0; i<${#flag_chars}; i++)); do
                 expanded_args+=("-${flag_chars:i:1}")
             done
+        elif [[ "$arg" =~ ^-[abcer]{2,}$ ]] && [[ "$arg" =~ r ]]; then
+            # Combined flag containing -r: not supported due to argument complexity
+            echo "Error: Combined flags with -r are not supported. Use -r separately: -r SERVER:/PATH" >&2
+            return 1
         else
             expanded_args+=("$arg")
         fi
@@ -218,9 +223,12 @@ if [[ "$COMMAND" == "validate" ]]; then
         shift
     done
 else
-    # Expand combined short flags first
+    # Expand combined short flags (-abc becomes -a -b -c, but -r combinations not supported)
     if [[ "$COMMAND" == "backup" ]]; then
         expanded_args=($(expand_combined_flags "$@"))
+        if [[ $? -ne 0 ]]; then
+            exit 1  # Error message already printed by expand_combined_flags
+        fi
         set -- "${expanded_args[@]}"
     fi
     while (( $# > 0 )); do

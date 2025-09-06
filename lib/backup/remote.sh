@@ -25,7 +25,6 @@ sync_to_remote() {
         "--delete"
         "--human-readable"
         "--progress"
-        "--itemize-changes"
     )
 
     # Add exclusions
@@ -38,8 +37,6 @@ sync_to_remote() {
     # Add source and destination
     rsync_args+=("$project_root/")
     rsync_args+=("$remote_target/$project_name/")
-
-    echo "Running: rsync ${rsync_args[*]}"
 
     if rsync "${rsync_args[@]}"; then
         echo "Remote sync completed: $remote_target/$project_name/"
@@ -67,13 +64,10 @@ sync_archive_to_remote() {
         "--archive"
         "--human-readable"
         "--progress"
-        "--itemize-changes"
     )
 
     rsync_args+=("$archive_file")
     rsync_args+=("$remote_target/")
-
-    echo "Running: rsync ${rsync_args[*]}"
 
     if rsync "${rsync_args[@]}"; then
         echo "Archive uploaded: $remote_target/$(basename "$archive_file")"
