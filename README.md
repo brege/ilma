@@ -201,6 +201,14 @@ COMPRESSION_TYPE="zstd"
 COMPRESSION_LEVEL="3"
 ```
 
+**Backup Naming Strategy**
+```bash .ilma.conf
+# Handle duplicate backup directories
+BACKUP_NAMING_STRATEGY="timestamp"  # project.bak-20250101-123456 (default)
+# BACKUP_NAMING_STRATEGY="numbered" # project.bak.1, project.bak.2
+# BACKUP_NAMING_STRATEGY="overwrite" # always overwrite project.bak
+```
+
 **Custom Exclusions**
 ```bash .ilma.conf
 PROJECT_TYPE="python"
