@@ -30,6 +30,44 @@ resolve_base_dir() {
     fi
 }
 
+# Generate unique backup directory name with timestamp/numbering
+resolve_backup_dir_with_deduplication() {
+    local base_path="$1"
+    local naming_strategy="${BACKUP_NAMING_STRATEGY:-timestamp}"
+
+    # If directory doesn't exist, use it as-is
+    if [[ ! -d "$base_path" ]]; then
+        echo "$base_path"
+        return
+    fi
+
+    case "$naming_strategy" in
+        "timestamp")
+            local timestamp
+            timestamp="$(date '+%Y%m%d-%H%M%S')"
+            echo "${base_path%.bak}-${timestamp}.bak"
+            ;;
+        "numbered")
+            local counter=1
+            local numbered_path="${base_path%.bak}.${counter}.bak"
+            while [[ -d "$numbered_path" ]]; do
+                ((counter++))
+                numbered_path="${base_path%.bak}.${counter}.bak"
+            done
+            echo "$numbered_path"
+            ;;
+        "overwrite")
+            echo "$base_path"
+            ;;
+        *)
+            # Default to timestamp
+            local timestamp
+            timestamp="$(date '+%Y%m%d-%H%M%S')"
+            echo "${base_path%.bak}-${timestamp}.bak"
+            ;;
+    esac
+}
+
 # Main backup function
 do_backup() {
     local project_root="$1"
@@ -42,8 +80,10 @@ do_backup() {
     # Configuration should be loaded before calling this function
     # Variables expected: BACKUP_BASE_DIR, CONFIG_FOUND, etc.
 
-    # Resolve backup directory path
-    MAIN_BACKUP_DIR=$(resolve_base_dir "$BACKUP_BASE_DIR" "$project_root" "$project_name" ".bak")
+    # Resolve backup directory path with deduplication
+    local base_backup_path
+    base_backup_path=$(resolve_base_dir "$BACKUP_BASE_DIR" "$project_root" "$project_name" ".bak")
+    MAIN_BACKUP_DIR=$(resolve_backup_dir_with_deduplication "$base_backup_path")
 
     # Set context mirror location
     if [[ -n "$CONTEXT_BASE_DIR" ]]; then

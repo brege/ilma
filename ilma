@@ -37,11 +37,11 @@ COMMANDS:
   extract                              Safely extract archive (prevents tarbombs)
 
 BACKUP OPTIONS:
-  --backup [OUTPUT_PATH]               Create backup directory (explicit)
-  --archive [OUTPUT_PATH]              Create compressed archive only
-  --encrypt [OUTPUT_PATH]              Create encrypted archive only  
-  --context [OUTPUT_PATH]              Create context mirror only
-  --remote SERVER:/PATH                Sync directly to remote server
+  -b, --backup [OUTPUT_PATH]           Create backup directory (explicit)
+  -a, --archive [OUTPUT_PATH]          Create compressed archive only
+  -e, --encrypt [OUTPUT_PATH]          Create encrypted archive only  
+  -c, --context [OUTPUT_PATH]          Create context mirror only
+  -r, --remote SERVER:/PATH            Sync directly to remote server
 
 SCAN/PRUNE OPTIONS:
   --type TYPE                          Use project type configuration
@@ -65,10 +65,10 @@ EXAMPLES:
   ilma                                 Backup current directory
   ilma ~/my-project                    Backup specific project  
   ilma --type latex                    Backup, ignoring common LaTeX cruft
-  ilma --archive                       Create compressed archive only
-  ilma --encrypt                       Create encrypted archive only
-  ilma --archive --remote srv:/backup  Archive and upload to remote server
-  ilma --context ~/docs                Create context mirror only
+  ilma -a                              Create compressed archive only
+  ilma -e                              Create encrypted archive only
+  ilma -ar srv:/backup                 Archive and upload to remote server
+  ilma -c ~/docs                       Create context mirror only
   ilma console                         Show project statistics
   ilma scan --type python --pretty     Scan Python project with detailed output
   ilma prune --type latex --verbose    Analyze LaTeX project cruft (dry-run only)
@@ -193,14 +193,43 @@ for arg in "$@"; do
     esac
 done
 
+# Expand combined short flags (e.g., -ar becomes -a -r)
+expand_combined_flags() {
+    local expanded_args=()
+    for arg in "$@"; do
+        if [[ "$arg" =~ ^-[abcer]{2,}$ ]]; then
+            # This is a combined short flag like -ar or -aer
+            local flag_chars="${arg#-}"
+            for ((i=0; i<${#flag_chars}; i++)); do
+                expanded_args+=("-${flag_chars:i:1}")
+            done
+        else
+            expanded_args+=("$arg")
+        fi
+    done
+    echo "${expanded_args[@]}"
+}
+
 # Second pass - parse remaining arguments
-while (( $# > 0 )); do
-    case "$1" in
-        backup|console|scan|prune|config|decrypt|extract|validate)
-            # Skip command names (already detected in first pass)
-            shift
-            ;;
-        --backup)
+# Skip parsing entirely if command is validate (let validate.sh handle its own args)
+if [[ "$COMMAND" == "validate" ]]; then
+    # Skip all arguments - validate.sh will handle them
+    while (( $# > 0 )); do
+        shift
+    done
+else
+    # Expand combined short flags first
+    if [[ "$COMMAND" == "backup" ]]; then
+        expanded_args=($(expand_combined_flags "$@"))
+        set -- "${expanded_args[@]}"
+    fi
+    while (( $# > 0 )); do
+        case "$1" in
+            backup|console|scan|prune|config|decrypt|extract|validate)
+                # Skip command names (already detected in first pass)
+                shift
+                ;;
+            --backup|-b)
             BACKUP_FLAG="true"
             # Check if next argument is explicitly an output path (directory path with .bak extension)
             if [[ -n "${2:-}" && "${2:0:1}" != "-" && "${2}" =~ \.bak$ ]]; then
@@ -210,7 +239,7 @@ while (( $# > 0 )); do
                 shift
             fi
             ;;
-        --archive)
+        --archive|-a)
             ARCHIVE_FLAG="true"
             # Check if next argument is explicitly an output path (ends with archive extension)
             if [[ -n "${2:-}" && "${2:0:1}" != "-" && "${2}" =~ \.(tar\.|tgz|tbz2|txz).*$ ]]; then
@@ -220,7 +249,7 @@ while (( $# > 0 )); do
                 shift
             fi
             ;;
-        --encrypt)
+        --encrypt|-e)
             ENCRYPT_FLAG="true"
             # Check if next argument is explicitly an output path (ends with archive extension or .gpg)
             if [[ -n "${2:-}" && "${2:0:1}" != "-" && ( "${2}" =~ \.(tar\.|tgz|tbz2|txz).*$ || "${2}" =~ \.gpg$ ) ]]; then
@@ -230,7 +259,7 @@ while (( $# > 0 )); do
                 shift
             fi
             ;;
-        --context)
+        --context|-c)
             CONTEXT_FLAG="true"
             # Check if next argument is explicitly an output path (has extension or is absolute path)
             if [[ -n "${2:-}" && "${2:0:1}" != "-" && ( "${2}" =~ \.[a-z]+$ || "${2:0:1}" == "/" ) ]]; then
@@ -240,7 +269,7 @@ while (( $# > 0 )); do
                 shift
             fi
             ;;
-        --remote)
+        --remote|-r)
             if [[ -z "${2:-}" ]]; then
                 echo "Error: --remote requires SERVER:/PATH argument" >&2
                 exit 1
@@ -307,7 +336,8 @@ while (( $# > 0 )); do
             shift
             ;;
     esac
-done
+    done
+fi
 
 # Set default project root if not specified
 if [[ -z "$PROJECT_ROOT" ]]; then
@@ -342,71 +372,68 @@ case "$COMMAND" in
         source "$ILMA_DIR/commands/config.sh"
         load_config "$PROJECT_ROOT" "$TYPE"
         
-        # Handle specialized backup modes
-        if [[ ( "$ARCHIVE_FLAG" == "true" || -n "$ARCHIVE_FLAG" ) && ( "$ENCRYPT_FLAG" == "true" || -n "$ENCRYPT_FLAG" ) ]]; then
-            # Combined archive + encrypt mode
-            source "$ILMA_DIR/lib/backup/encrypt.sh"
-            output_path="$([[ "$ENCRYPT_FLAG" == "true" ]] && echo "" || echo "$ENCRYPT_FLAG")"
-            create_encrypted_archive "$PROJECT_ROOT" "$output_path"
-            
-            # Handle remote upload if specified
-            if [[ -n "$REMOTE_FLAG" ]]; then
-                source "$ILMA_DIR/lib/backup/remote.sh"
-                encrypted_file="$output_path"
-                [[ -z "$encrypted_file" ]] && encrypted_file="$(dirname "$PROJECT_ROOT")/$(basename "$PROJECT_ROOT")$(get_archive_extension "$COMPRESSION_TYPE").gpg"
-                sync_archive_to_remote "$encrypted_file" "$REMOTE_FLAG"
-            fi
-            
-        elif [[ "$ARCHIVE_FLAG" == "true" || -n "$ARCHIVE_FLAG" ]]; then
-            # Archive-only mode
+        # Handle multiple backup operations (no longer mutually exclusive)
+        OPERATIONS_PERFORMED=false
+        
+        # Standard backup operation
+        if [[ "$BACKUP_FLAG" == "true" || -n "$BACKUP_FLAG" ]]; then
+            source "$ILMA_DIR/commands/backup.sh"
+            do_backup "$PROJECT_ROOT"
+            OPERATIONS_PERFORMED=true
+        fi
+        
+        # Archive operation
+        if [[ "$ARCHIVE_FLAG" == "true" || -n "$ARCHIVE_FLAG" ]]; then
             source "$ILMA_DIR/lib/backup/archive.sh"
             output_path="$([[ "$ARCHIVE_FLAG" == "true" ]] && echo "" || echo "$ARCHIVE_FLAG")"
             create_archive_only "$PROJECT_ROOT" "$output_path"
+            OPERATIONS_PERFORMED=true
             
-            # Handle remote upload if specified
+            # Handle remote upload for archive if specified
             if [[ -n "$REMOTE_FLAG" ]]; then
                 source "$ILMA_DIR/lib/backup/remote.sh"
                 archive_file="$output_path"
                 [[ -z "$archive_file" ]] && archive_file="$(dirname "$PROJECT_ROOT")/$(basename "$PROJECT_ROOT")$(get_archive_extension "$COMPRESSION_TYPE")"
                 sync_archive_to_remote "$archive_file" "$REMOTE_FLAG"
             fi
-            
-        elif [[ "$ENCRYPT_FLAG" == "true" || -n "$ENCRYPT_FLAG" ]]; then
-            # Encrypt-only mode
+        fi
+        
+        # Encrypt operation (creates encrypted archive)
+        if [[ "$ENCRYPT_FLAG" == "true" || -n "$ENCRYPT_FLAG" ]]; then
             source "$ILMA_DIR/lib/backup/encrypt.sh"
             output_path="$([[ "$ENCRYPT_FLAG" == "true" ]] && echo "" || echo "$ENCRYPT_FLAG")"
             create_encrypted_archive "$PROJECT_ROOT" "$output_path"
+            OPERATIONS_PERFORMED=true
             
-            # Handle remote upload if specified
+            # Handle remote upload for encrypted file if specified
             if [[ -n "$REMOTE_FLAG" ]]; then
                 source "$ILMA_DIR/lib/backup/remote.sh"
                 encrypted_file="$output_path"
                 [[ -z "$encrypted_file" ]] && encrypted_file="$(dirname "$PROJECT_ROOT")/$(basename "$PROJECT_ROOT")$(get_archive_extension "$COMPRESSION_TYPE").gpg"
                 sync_archive_to_remote "$encrypted_file" "$REMOTE_FLAG"
             fi
-            
-        elif [[ "$CONTEXT_FLAG" == "true" || -n "$CONTEXT_FLAG" ]]; then
-            # Context-only mode
+        fi
+        
+        # Context operation
+        if [[ "$CONTEXT_FLAG" == "true" || -n "$CONTEXT_FLAG" ]]; then
             source "$ILMA_DIR/lib/backup/context.sh"
             output_path="$([[ "$CONTEXT_FLAG" == "true" ]] && echo "" || echo "$CONTEXT_FLAG")"
             create_context_only "$PROJECT_ROOT" "$output_path"
-            
-        elif [[ "$BACKUP_FLAG" == "true" || -n "$BACKUP_FLAG" ]]; then
-            # Explicit backup mode
-            source "$ILMA_DIR/commands/backup.sh"
-            # Note: BACKUP_FLAG output path would need custom handling in backup.sh for non-default paths
-            do_backup "$PROJECT_ROOT"
-            
-        elif [[ -n "$REMOTE_FLAG" ]]; then
-            # Direct remote sync mode
+            OPERATIONS_PERFORMED=true
+        fi
+        
+        # Remote sync operation (for non-archive files)
+        if [[ -n "$REMOTE_FLAG" && "$ARCHIVE_FLAG" != "true" && -z "$ARCHIVE_FLAG" && "$ENCRYPT_FLAG" != "true" && -z "$ENCRYPT_FLAG" ]]; then
             source "$ILMA_DIR/lib/backup/remote.sh"
             sync_to_remote "$PROJECT_ROOT" "$REMOTE_FLAG"
-            
-        else
-            # Standard backup mode (default when no operation flags specified)
+            OPERATIONS_PERFORMED=true
+        fi
+        
+        # Default backup if no operations specified
+        if [[ "$OPERATIONS_PERFORMED" == "false" ]]; then
             source "$ILMA_DIR/commands/backup.sh"
             do_backup "$PROJECT_ROOT"
-
+            
             # Show stats after backup completion
             if [[ "$CONFIG_FOUND" == "true" ]]; then
                 # Set mirror directory path for stats
@@ -506,47 +533,21 @@ case "$COMMAND" in
         show_config "$PROJECT_ROOT"
         ;;
     validate)
-        source "$ILMA_DIR/commands/validate.sh"
-        
-        # Parse validation arguments from original args
-        VALIDATION_LEVEL="basic"
-        VALIDATION_PROJECT="$(pwd)"
-        
-        # Find validate in original args and parse what follows
+        # Extract args after 'validate' command and pass them directly to validate.sh
+        validate_args=()
         validate_found=false
         for ((i=0; i<${#ORIGINAL_ARGS[@]}; i++)); do
             if [[ "${ORIGINAL_ARGS[i]}" == "validate" ]]; then
                 validate_found=true
-                # Check next argument
-                if [[ $((i+1)) -lt ${#ORIGINAL_ARGS[@]} ]]; then
-                    next_arg="${ORIGINAL_ARGS[$((i+1))]}"
-                    # Check if it's a validation level (accept both smoke-test and smoketest)
-                    if [[ "$next_arg" =~ ^(basic|full|smoke-test|smoketest)$ ]]; then
-                        # Normalize smoketest to smoke-test
-                        if [[ "$next_arg" == "smoketest" ]]; then
-                            next_arg="smoke-test"
-                        fi
-                        VALIDATION_LEVEL="$next_arg"
-                        # Check for project path after level
-                        if [[ $((i+2)) -lt ${#ORIGINAL_ARGS[@]} ]]; then
-                            VALIDATION_PROJECT="$(realpath "${ORIGINAL_ARGS[$((i+2))]}" 2>/dev/null)" || {
-                                echo "Error: Invalid project path '${ORIGINAL_ARGS[$((i+2))]}'"
-                                exit 1
-                            }
-                        fi
-                    else
-                        # Next argument is project path, use default basic level
-                        VALIDATION_PROJECT="$(realpath "$next_arg" 2>/dev/null)" || {
-                            echo "Error: Invalid project path '$next_arg'"
-                            exit 1
-                        }
-                    fi
-                fi
-                break
+                continue
+            fi
+            if [[ "$validate_found" == "true" ]]; then
+                validate_args+=("${ORIGINAL_ARGS[i]}")
             fi
         done
         
-        run_validation "$VALIDATION_LEVEL" "$VALIDATION_PROJECT"
+        # Call validate.sh directly with all original arguments
+        "$ILMA_DIR/commands/validate.sh" "${validate_args[@]}"
         ;;
     decrypt)
         source "$ILMA_DIR/commands/decrypt.sh"

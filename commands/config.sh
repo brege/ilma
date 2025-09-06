@@ -30,6 +30,7 @@ load_ini_config() {
                 compression.level) COMPRESSION_LEVEL="$value" ;;
                 backup.create_compressed_archive) CREATE_COMPRESSED_ARCHIVE="$value" ;;
                 backup.max_archives) MAX_ARCHIVES="$value" ;;
+                backup.naming_strategy) BACKUP_NAMING_STRATEGY="$value" ;;
                 backup.backup_xdg_dirs) BACKUP_XDG_DIRS="$value" ;;
                 backup.backup_base_dir) BACKUP_BASE_DIR="$value" ;;
                 backup.archive_base_dir) ARCHIVE_BASE_DIR="$value" ;;
@@ -56,6 +57,7 @@ load_config() {
     CONTEXT_BASE_DIR=""
     CREATE_COMPRESSED_ARCHIVE=false
     MAX_ARCHIVES=5
+    BACKUP_NAMING_STRATEGY="timestamp"
     BACKUP_XDG_DIRS=false
     XDG_PATHS=("$HOME/.config" "$HOME/.local/share" "$HOME/.cache")
     EXTENSIONS=(md txt)
@@ -219,6 +221,7 @@ show_config() {
         echo "Settings:"
         echo "  CREATE_COMPRESSED_ARCHIVE = $CREATE_COMPRESSED_ARCHIVE"
         echo "  MAX_ARCHIVES             = $MAX_ARCHIVES"
+        echo "  BACKUP_NAMING_STRATEGY   = $BACKUP_NAMING_STRATEGY"
         echo "  BACKUP_XDG_DIRS          = $BACKUP_XDG_DIRS"
         echo "  EXTENSIONS               = (${EXTENSIONS[*]})"
     else
