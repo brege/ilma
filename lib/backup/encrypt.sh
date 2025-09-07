@@ -1,7 +1,7 @@
 #!/bin/bash
 # lib/backup/encrypt.sh - Encryption operations
 
-# Encrypt-only operation (creates encrypted archive)
+# Encrypt-only operation (creates encrypted archive using pipeline)
 create_gpg() {
     local project_root="$1"
     local output_path="$2"
@@ -17,12 +17,14 @@ create_gpg() {
     source "$ILMA_DIR/lib/deps/compression.sh"
     source "$ILMA_DIR/lib/deps/gpg.sh"
 
-    # Create temporary archive first
-    local temp_archive
-    temp_archive="/tmp/${project_name}-$$.$(get_archive_extension "$COMPRESSION_TYPE")"
-    echo "Creating temporary archive for encryption..."
+    # Determine output path
+    if [[ -z "$output_path" ]]; then
+        output_path="$(dirname "$project_root")/${project_name}$(get_archive_extension "$COMPRESSION_TYPE")${GPG_OUTPUT_EXTENSION:-.gpg}"
+    fi
 
-    # Build tar command with exclusions
+    echo "Creating encrypted archive: $output_path"
+
+    # Build tar command with exclusions for pipeline
     local tar_args=("--create")
     local compression_option
     compression_option=$(get_tar_option "$COMPRESSION_TYPE")
@@ -34,8 +36,6 @@ create_gpg() {
             tar_args+=("$exclude")
         fi
     done
-
-    tar_args+=("--file=$temp_archive")
 
     # For single directory origins, avoid unnecessary nesting by archiving contents directly
     # Check if this is a single directory target (not a working directory with .git, etc.)
@@ -55,27 +55,12 @@ create_gpg() {
         tar_args+=("$project_name")
     fi
 
-    if ! tar "${tar_args[@]}"; then
-        echo "Error: Failed to create temporary archive" >&2
-        rm -f "$temp_archive"
-        return 1
-    fi
-
-    # Determine output path
-    if [[ -z "$output_path" ]]; then
-        output_path="$(dirname "$project_root")/${project_name}$(get_archive_extension "$COMPRESSION_TYPE")${GPG_OUTPUT_EXTENSION:-.gpg}"
-    fi
-
-    echo "Encrypting archive to: $output_path"
-
-    # Encrypt the archive
-    if encrypt_file "$temp_archive" "$output_path"; then
+    # Execute tar→gpg pipeline
+    if tar "${tar_args[@]}" | gpg --yes --batch --encrypt --recipient "$GPG_KEY_ID" --trust-model always --quiet -o "$output_path"; then
         echo "Encrypted archive created: $output_path"
-        rm -f "$temp_archive"
         return 0
     else
-        echo "Error: Failed to encrypt archive" >&2
-        rm -f "$temp_archive"
+        echo "Error: Failed to create encrypted archive" >&2
         return 1
     fi
 }
@@ -107,7 +92,7 @@ encrypt_existing_file() {
     fi
 }
 
-# Encrypt-only operation for multiple origins
+# Encrypt-only operation for multiple origins (using pipeline)
 create_multi_origin_gpg() {
     local output_path="$1"
     shift
@@ -137,12 +122,7 @@ create_multi_origin_gpg() {
     source "$ILMA_DIR/lib/deps/compression.sh"
     source "$ILMA_DIR/lib/deps/gpg.sh"
 
-    # Create temporary archive first
-    local temp_archive
-    temp_archive="/tmp/multi-origin-$$.$(get_archive_extension "$COMPRESSION_TYPE")"
-    echo "Creating temporary archive for encryption..."
-
-    # Build tar command with exclusions
+    # Build tar command with exclusions for pipeline
     local tar_args=("--create")
     local compression_option
     compression_option=$(get_tar_option "$COMPRESSION_TYPE")
@@ -155,29 +135,17 @@ create_multi_origin_gpg() {
         fi
     done
 
-    tar_args+=("--file=$temp_archive")
-
     # Add all paths for multi-origin
     for path in "${paths[@]}"; do
         tar_args+=("$path")
     done
 
-    if ! tar "${tar_args[@]}"; then
-        echo "Error: Failed to create temporary archive" >&2
-        rm -f "$temp_archive"
-        return 1
-    fi
-
-    echo "Encrypting archive to: $output_path"
-
-    # Encrypt the archive
-    if encrypt_file "$temp_archive" "$output_path"; then
+    # Execute tar→gpg pipeline
+    if tar "${tar_args[@]}" | gpg --yes --batch --encrypt --recipient "$GPG_KEY_ID" --trust-model always --quiet -o "$output_path"; then
         echo "Multi-origin encrypted archive created: $output_path"
-        rm -f "$temp_archive"
         return 0
     else
-        echo "Error: Failed to encrypt archive" >&2
-        rm -f "$temp_archive"
+        echo "Error: Failed to create encrypted archive" >&2
         return 1
     fi
 }
