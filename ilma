@@ -56,6 +56,8 @@ DECRYPT/EXTRACT OPTIONS:
   --target DIR                         Extract to specific directory
 
 GLOBAL OPTIONS:
+  --target DIR                         Target directory for outputs
+  --basename NAME                      Custom output filename (without extension)
   -h, --help                           Show this help
 
 PROJECT TYPES:
@@ -353,6 +355,14 @@ else
             OUTDIR_FLAG="$2"
             shift 2
             ;;
+        --basename)
+            if [[ -z "${2:-}" ]]; then
+                echo "Error: --basename requires a filename" >&2
+                exit 1
+            fi
+            BASENAME_FLAG="$2"
+            shift 2
+            ;;
         backup|console|scan|prune|config|decrypt|extract)
             # Skip command names
             shift
@@ -468,18 +478,35 @@ case "$COMMAND" in
             if [[ ${#ADDITIONAL_PATHS[@]} -gt 0 ]]; then
                 # Multi-origin archive
                 all_paths=("$PROJECT_ROOT" "${ADDITIONAL_PATHS[@]}")
-                # Override with --target if specified
-                if [[ -n "$OUTDIR_FLAG" && -z "$output_path" ]]; then
-                    timestamp="$(date '+%Y%m%d-%H%M%S')"
-                    output_path="$OUTDIR_FLAG/multi-origin-${timestamp}$(get_archive_extension "$COMPRESSION_TYPE")"
+                # Build output path with --target and --basename
+                if [[ -z "$output_path" ]]; then
+                    if [[ -n "$BASENAME_FLAG" ]]; then
+                        basename="$BASENAME_FLAG"
+                    else
+                        timestamp="$(date '+%Y%m%d-%H%M%S')"
+                        basename="multi-origin-${timestamp}"
+                    fi
+                    if [[ -n "$OUTDIR_FLAG" ]]; then
+                        output_path="$OUTDIR_FLAG/${basename}$(get_archive_extension "$COMPRESSION_TYPE")"
+                    else
+                        output_path="./${basename}$(get_archive_extension "$COMPRESSION_TYPE")"
+                    fi
                 fi
                 create_multi_origin_archive "$output_path" "${all_paths[@]}"
             else
                 # Single origin archive
-                # Override with --target if specified
-                if [[ -n "$OUTDIR_FLAG" && -z "$output_path" ]]; then
-                    project_name="$(basename "$PROJECT_ROOT")"
-                    output_path="$OUTDIR_FLAG/${project_name}$(get_archive_extension "$COMPRESSION_TYPE")"
+                # Build output path with --target and --basename
+                if [[ -z "$output_path" ]]; then
+                    if [[ -n "$BASENAME_FLAG" ]]; then
+                        basename="$BASENAME_FLAG"
+                    else
+                        basename="$(basename "$PROJECT_ROOT")"
+                    fi
+                    if [[ -n "$OUTDIR_FLAG" ]]; then
+                        output_path="$OUTDIR_FLAG/${basename}$(get_archive_extension "$COMPRESSION_TYPE")"
+                    else
+                        output_path="$(dirname "$PROJECT_ROOT")/${basename}$(get_archive_extension "$COMPRESSION_TYPE")"
+                    fi
                 fi
                 create_archive_only "$PROJECT_ROOT" "$output_path"
             fi
@@ -503,20 +530,37 @@ case "$COMMAND" in
             if [[ ${#ADDITIONAL_PATHS[@]} -gt 0 ]]; then
                 # Multi-origin encrypt
                 all_paths=("$PROJECT_ROOT" "${ADDITIONAL_PATHS[@]}")
-                # Override with --target if specified
-                if [[ -n "$OUTDIR_FLAG" && -z "$output_path" ]]; then
-                    timestamp="$(date '+%Y%m%d-%H%M%S')"
-                    output_path="$OUTDIR_FLAG/multi-origin-${timestamp}$(get_archive_extension "$COMPRESSION_TYPE")${GPG_OUTPUT_EXTENSION:-.gpg}"
+                # Build output path with --target and --basename
+                if [[ -z "$output_path" ]]; then
+                    if [[ -n "$BASENAME_FLAG" ]]; then
+                        basename="$BASENAME_FLAG"
+                    else
+                        timestamp="$(date '+%Y%m%d-%H%M%S')"
+                        basename="multi-origin-${timestamp}"
+                    fi
+                    if [[ -n "$OUTDIR_FLAG" ]]; then
+                        output_path="$OUTDIR_FLAG/${basename}$(get_archive_extension "$COMPRESSION_TYPE")${GPG_OUTPUT_EXTENSION:-.gpg}"
+                    else
+                        output_path="./${basename}$(get_archive_extension "$COMPRESSION_TYPE")${GPG_OUTPUT_EXTENSION:-.gpg}"
+                    fi
                 fi
-                create_multi_origin_encrypted_archive "$output_path" "${all_paths[@]}"
+                create_multi_origin_gpg "$output_path" "${all_paths[@]}"
             else
                 # Single origin encrypt
-                # Override with --target if specified
-                if [[ -n "$OUTDIR_FLAG" && -z "$output_path" ]]; then
-                    project_name="$(basename "$PROJECT_ROOT")"
-                    output_path="$OUTDIR_FLAG/${project_name}$(get_archive_extension "$COMPRESSION_TYPE")${GPG_OUTPUT_EXTENSION:-.gpg}"
+                # Build output path with --target and --basename
+                if [[ -z "$output_path" ]]; then
+                    if [[ -n "$BASENAME_FLAG" ]]; then
+                        basename="$BASENAME_FLAG"
+                    else
+                        basename="$(basename "$PROJECT_ROOT")"
+                    fi
+                    if [[ -n "$OUTDIR_FLAG" ]]; then
+                        output_path="$OUTDIR_FLAG/${basename}$(get_archive_extension "$COMPRESSION_TYPE")${GPG_OUTPUT_EXTENSION:-.gpg}"
+                    else
+                        output_path="$(dirname "$PROJECT_ROOT")/${basename}$(get_archive_extension "$COMPRESSION_TYPE")${GPG_OUTPUT_EXTENSION:-.gpg}"
+                    fi
                 fi
-                create_encrypted_archive "$PROJECT_ROOT" "$output_path"
+                create_gpg "$PROJECT_ROOT" "$output_path"
             fi
             OPERATIONS_PERFORMED=true
             
