@@ -2,7 +2,7 @@
 # lib/backup/encrypt.sh - Encryption operations
 
 # Encrypt-only operation (creates encrypted archive)
-create_encrypted_archive() {
+create_gpg() {
     local project_root="$1"
     local output_path="$2"
     local project_name
@@ -108,7 +108,7 @@ encrypt_existing_file() {
 }
 
 # Encrypt-only operation for multiple origins
-create_multi_origin_encrypted_archive() {
+create_multi_origin_gpg() {
     local output_path="$1"
     shift
     local paths=("$@")
