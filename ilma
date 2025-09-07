@@ -463,12 +463,26 @@ case "$COMMAND" in
         if [[ "$ARCHIVE_FLAG" == "true" || -n "$ARCHIVE_FLAG" ]]; then
             source "$ILMA_DIR/lib/backup/archive.sh"
             output_path="$([[ "$ARCHIVE_FLAG" == "true" ]] && echo "" || echo "$ARCHIVE_FLAG")"
-            # Override with --target if specified
-            if [[ -n "$OUTDIR_FLAG" && -z "$output_path" ]]; then
-                project_name="$(basename "$PROJECT_ROOT")"
-                output_path="$OUTDIR_FLAG/${project_name}$(get_archive_extension "$COMPRESSION_TYPE")"
+            
+            # Check if we have multiple origins
+            if [[ ${#ADDITIONAL_PATHS[@]} -gt 0 ]]; then
+                # Multi-origin archive
+                all_paths=("$PROJECT_ROOT" "${ADDITIONAL_PATHS[@]}")
+                # Override with --target if specified
+                if [[ -n "$OUTDIR_FLAG" && -z "$output_path" ]]; then
+                    timestamp="$(date '+%Y%m%d-%H%M%S')"
+                    output_path="$OUTDIR_FLAG/multi-origin-${timestamp}$(get_archive_extension "$COMPRESSION_TYPE")"
+                fi
+                create_multi_origin_archive "$output_path" "${all_paths[@]}"
+            else
+                # Single origin archive
+                # Override with --target if specified
+                if [[ -n "$OUTDIR_FLAG" && -z "$output_path" ]]; then
+                    project_name="$(basename "$PROJECT_ROOT")"
+                    output_path="$OUTDIR_FLAG/${project_name}$(get_archive_extension "$COMPRESSION_TYPE")"
+                fi
+                create_archive_only "$PROJECT_ROOT" "$output_path"
             fi
-            create_archive_only "$PROJECT_ROOT" "$output_path"
             OPERATIONS_PERFORMED=true
             
             # Handle remote upload for archive if specified
@@ -484,12 +498,26 @@ case "$COMMAND" in
         if [[ "$ENCRYPT_FLAG" == "true" || -n "$ENCRYPT_FLAG" ]]; then
             source "$ILMA_DIR/lib/backup/encrypt.sh"
             output_path="$([[ "$ENCRYPT_FLAG" == "true" ]] && echo "" || echo "$ENCRYPT_FLAG")"
-            # Override with --target if specified
-            if [[ -n "$OUTDIR_FLAG" && -z "$output_path" ]]; then
-                project_name="$(basename "$PROJECT_ROOT")"
-                output_path="$OUTDIR_FLAG/${project_name}$(get_archive_extension "$COMPRESSION_TYPE")${GPG_OUTPUT_EXTENSION:-.gpg}"
+            
+            # Check if we have multiple origins
+            if [[ ${#ADDITIONAL_PATHS[@]} -gt 0 ]]; then
+                # Multi-origin encrypt
+                all_paths=("$PROJECT_ROOT" "${ADDITIONAL_PATHS[@]}")
+                # Override with --target if specified
+                if [[ -n "$OUTDIR_FLAG" && -z "$output_path" ]]; then
+                    timestamp="$(date '+%Y%m%d-%H%M%S')"
+                    output_path="$OUTDIR_FLAG/multi-origin-${timestamp}$(get_archive_extension "$COMPRESSION_TYPE")${GPG_OUTPUT_EXTENSION:-.gpg}"
+                fi
+                create_multi_origin_encrypted_archive "$output_path" "${all_paths[@]}"
+            else
+                # Single origin encrypt
+                # Override with --target if specified
+                if [[ -n "$OUTDIR_FLAG" && -z "$output_path" ]]; then
+                    project_name="$(basename "$PROJECT_ROOT")"
+                    output_path="$OUTDIR_FLAG/${project_name}$(get_archive_extension "$COMPRESSION_TYPE")${GPG_OUTPUT_EXTENSION:-.gpg}"
+                fi
+                create_encrypted_archive "$PROJECT_ROOT" "$output_path"
             fi
-            create_encrypted_archive "$PROJECT_ROOT" "$output_path"
             OPERATIONS_PERFORMED=true
             
             # Handle remote upload for encrypted file if specified
