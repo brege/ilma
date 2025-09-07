@@ -106,3 +106,78 @@ encrypt_existing_file() {
         return 1
     fi
 }
+
+# Encrypt-only operation for multiple origins
+create_multi_origin_encrypted_archive() {
+    local output_path="$1"
+    shift
+    local paths=("$@")
+
+    if [[ ${#paths[@]} -eq 0 ]]; then
+        echo "Error: No paths provided for multi-origin encryption" >&2
+        return 1
+    fi
+
+    if [[ -z "$GPG_KEY_ID" ]]; then
+        echo "Error: GPG_KEY_ID not configured for encryption" >&2
+        return 1
+    fi
+
+    # Generate output path if not provided
+    if [[ -z "$output_path" ]]; then
+        local timestamp
+        timestamp="$(date '+%Y%m%d-%H%M%S')"
+        output_path="./multi-origin-${timestamp}$(get_archive_extension "$COMPRESSION_TYPE")${GPG_OUTPUT_EXTENSION:-.gpg}"
+    fi
+
+    echo "Creating multi-origin encrypted archive: $output_path"
+    echo "Sources: ${paths[*]}"
+
+    # Source required libraries
+    source "$ILMA_DIR/lib/deps/compression.sh"
+    source "$ILMA_DIR/lib/deps/gpg.sh"
+
+    # Create temporary archive first
+    local temp_archive
+    temp_archive="/tmp/multi-origin-$$.$(get_archive_extension "$COMPRESSION_TYPE")"
+    echo "Creating temporary archive for encryption..."
+
+    # Build tar command with exclusions
+    local tar_args=("--create")
+    local compression_option
+    compression_option=$(get_tar_option "$COMPRESSION_TYPE")
+    [[ -n "$compression_option" ]] && tar_args+=("$compression_option")
+
+    # Add exclusions
+    for exclude in "${RSYNC_EXCLUDES[@]}"; do
+        if [[ "$exclude" == --exclude* ]]; then
+            tar_args+=("$exclude")
+        fi
+    done
+
+    tar_args+=("--file=$temp_archive")
+
+    # Add all paths for multi-origin
+    for path in "${paths[@]}"; do
+        tar_args+=("$path")
+    done
+
+    if ! tar "${tar_args[@]}"; then
+        echo "Error: Failed to create temporary archive" >&2
+        rm -f "$temp_archive"
+        return 1
+    fi
+
+    echo "Encrypting archive to: $output_path"
+
+    # Encrypt the archive
+    if encrypt_file "$temp_archive" "$output_path"; then
+        echo "Multi-origin encrypted archive created: $output_path"
+        rm -f "$temp_archive"
+        return 0
+    else
+        echo "Error: Failed to encrypt archive" >&2
+        rm -f "$temp_archive"
+        return 1
+    fi
+}

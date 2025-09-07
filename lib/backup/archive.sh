@@ -85,3 +85,57 @@ create_archive_only() {
         return 1
     fi
 }
+
+# Archive creation for multiple origins
+create_multi_origin_archive() {
+    local output_path="$1"
+    shift
+    local paths=("$@")
+
+    if [[ ${#paths[@]} -eq 0 ]]; then
+        echo "Error: No paths provided for multi-origin archive" >&2
+        return 1
+    fi
+
+    # Generate output path if not provided
+    if [[ -z "$output_path" ]]; then
+        local timestamp
+        timestamp="$(date '+%Y%m%d-%H%M%S')"
+        output_path="./multi-origin-${timestamp}$(get_archive_extension "$COMPRESSION_TYPE")"
+    fi
+
+    echo "Creating multi-origin archive: $output_path"
+    echo "Sources: ${paths[*]}"
+
+    # Source compression utilities
+    source "$ILMA_DIR/lib/deps/compression.sh"
+
+    # Build tar command with exclusions
+    local tar_args=("--create")
+    local compression_option
+    compression_option=$(get_tar_option "$COMPRESSION_TYPE")
+    [[ -n "$compression_option" ]] && tar_args+=("$compression_option")
+
+    # Add exclusions
+    for exclude in "${RSYNC_EXCLUDES[@]}"; do
+        if [[ "$exclude" == --exclude* ]]; then
+            tar_args+=("$exclude")
+        fi
+    done
+
+    tar_args+=("--file=$output_path")
+
+    # For multi-origin, we need to be careful about the working directory
+    # Add all paths - tar will handle relative paths from current directory
+    for path in "${paths[@]}"; do
+        tar_args+=("$path")
+    done
+
+    if tar "${tar_args[@]}"; then
+        echo "Multi-origin archive created: $output_path"
+        return 0
+    else
+        echo "Error: Failed to create multi-origin archive" >&2
+        return 1
+    fi
+}
