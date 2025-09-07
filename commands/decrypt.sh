@@ -93,7 +93,7 @@ extract_decrypted_archive() {
             rm -rf "$target_dir"
         else
             echo "Error: Target directory already exists: $target_dir"
-            echo "Use --force to replace, or --outdir to specify different location"
+            echo "Use --force to replace, or --target to specify different location"
             return 1
         fi
     fi
