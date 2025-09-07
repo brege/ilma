@@ -53,7 +53,7 @@ SCAN/PRUNE OPTIONS:
 DECRYPT/EXTRACT OPTIONS:
   --no-extract                         Decrypt only, do not extract archive
   --force                              Replace existing directories
-  --outdir DIR                         Extract to specific directory
+  --target DIR                         Extract to specific directory
 
 GLOBAL OPTIONS:
   -h, --help                           Show this help
@@ -127,13 +127,13 @@ Supports all compression formats: .tar.zst, .tar.gz, .tar.bz2, .tar.xz, etc.
 
 OPTIONS:
   --force            Replace existing target directory if it exists
-  --outdir DIR       Extract to specific directory instead of auto-generated name
+  --target DIR       Extract to specific directory instead of auto-generated name
 
 Examples:
   ilma extract project.tar.zst             # Extracts to project/
   ilma extract backup.tar.gz               # Extracts to backup/
   ilma extract --force project.tar.zst     # Replace existing project/ directory
-  ilma extract --outdir temp backup.tar.gz # Extract to temp/ directory
+  ilma extract --target temp backup.tar.gz # Extract to temp/ directory
 EOF
             exit 0
             ;;
@@ -146,14 +146,14 @@ Decrypt a GPG-encrypted file and optionally extract if it's an archive.
 OPTIONS:
   --no-extract       Decrypt only, do not extract archive
   --force            Replace existing target directory if it exists
-  --outdir DIR       Extract to specific directory instead of auto-generated name
+  --target DIR       Extract to specific directory instead of auto-generated name
 
 Examples:
   ilma decrypt backup.tar.zst.gpg              # Decrypt and extract to backup/
   ilma decrypt project.tar.gz.gpg             # Decrypt and extract to project/
   ilma decrypt --no-extract data.tar.gpg      # Decrypt to data.tar only
   ilma decrypt --force backup.tar.zst.gpg     # Replace existing backup/ directory
-  ilma decrypt --outdir restored backup.gpg   # Extract to restored/ directory
+  ilma decrypt --target restored backup.gpg   # Extract to restored/ directory
 EOF
             exit 0
             ;;
@@ -200,7 +200,7 @@ expand_combined_flags() {
     for arg in "$@"; do
         if [[ "$arg" =~ ^-[abce]{2,}$ ]]; then
             # This is a combined short flag WITHOUT -r (which requires an argument)
-            local flag_chars="${arg#-}"
+            flag_chars="${arg#-}"
             for ((i=0; i<${#flag_chars}; i++)); do
                 expanded_args+=("-${flag_chars:i:1}")
             done
@@ -237,7 +237,7 @@ else
                 -*) 
                     # Handle combined flags
                     if [[ "$arg" =~ ^-[abce]{2,}$ ]]; then
-                        local flag_chars="${arg#-}"
+                        flag_chars="${arg#-}"
                         for ((i=0; i<${#flag_chars}; i++)); do
                             case "${flag_chars:i:1}" in
                                 a) expanded_args+=(--archive) ;;
@@ -283,8 +283,8 @@ else
             ;;
         --encrypt|-e)
             ENCRYPT_FLAG="true"
-            # Check if next argument is explicitly an output path (ends with archive extension or .gpg)
-            if [[ -n "${2:-}" && "${2:0:1}" != "-" && ( "${2}" =~ \.(tar\.|tgz|tbz2|txz).*$ || "${2}" =~ \.gpg$ ) ]]; then
+            # Check if next argument is explicitly an output path (must end with .gpg to be output)
+            if [[ -n "${2:-}" && "${2:0:1}" != "-" && "${2}" =~ \.gpg$ ]]; then
                 ENCRYPT_FLAG="$2"
                 shift 2
             else
@@ -345,9 +345,9 @@ else
             FORCE_FLAG="true"
             shift
             ;;
-        --outdir)
+        --target)
             if [[ -z "${2:-}" ]]; then
-                echo "Error: --outdir requires a directory path" >&2
+                echo "Error: --target requires a directory path" >&2
                 exit 1
             fi
             OUTDIR_FLAG="$2"
@@ -362,10 +362,19 @@ else
             shift
             ;;
         *)
+            # Collect all remaining arguments as potential project paths
             if [[ -z "$PROJECT_ROOT" ]]; then
                 PROJECT_ROOT="$(realpath "$1" 2>/dev/null)" || { echo "Error: Invalid path '$1'"; exit 1; }
+                ADDITIONAL_PATHS=()
+                shift
+                while [[ $# -gt 0 && "$1" != --* ]]; do
+                    resolved_path="$(realpath "$1" 2>/dev/null)" || { echo "Error: Invalid path '$1'"; exit 1; }
+                    ADDITIONAL_PATHS+=("$resolved_path")
+                    shift
+                done
+            else
+                shift
             fi
-            shift
             ;;
     esac
     done
@@ -435,7 +444,18 @@ case "$COMMAND" in
         # Standard backup operation
         if [[ "$BACKUP_FLAG" == "true" || -n "$BACKUP_FLAG" ]]; then
             source "$ILMA_DIR/commands/backup.sh"
-            do_backup "$PROJECT_ROOT"
+            # Override base directories with --target if specified
+            if [[ -n "$OUTDIR_FLAG" ]]; then
+                original_backup_base_dir="$BACKUP_BASE_DIR"
+                original_context_base_dir="$CONTEXT_BASE_DIR"
+                BACKUP_BASE_DIR="$OUTDIR_FLAG"
+                CONTEXT_BASE_DIR="$OUTDIR_FLAG"
+                do_backup "$PROJECT_ROOT"
+                BACKUP_BASE_DIR="$original_backup_base_dir"
+                CONTEXT_BASE_DIR="$original_context_base_dir"
+            else
+                do_backup "$PROJECT_ROOT"
+            fi
             OPERATIONS_PERFORMED=true
         fi
         
@@ -443,6 +463,11 @@ case "$COMMAND" in
         if [[ "$ARCHIVE_FLAG" == "true" || -n "$ARCHIVE_FLAG" ]]; then
             source "$ILMA_DIR/lib/backup/archive.sh"
             output_path="$([[ "$ARCHIVE_FLAG" == "true" ]] && echo "" || echo "$ARCHIVE_FLAG")"
+            # Override with --target if specified
+            if [[ -n "$OUTDIR_FLAG" && -z "$output_path" ]]; then
+                project_name="$(basename "$PROJECT_ROOT")"
+                output_path="$OUTDIR_FLAG/${project_name}$(get_archive_extension "$COMPRESSION_TYPE")"
+            fi
             create_archive_only "$PROJECT_ROOT" "$output_path"
             OPERATIONS_PERFORMED=true
             
@@ -459,6 +484,11 @@ case "$COMMAND" in
         if [[ "$ENCRYPT_FLAG" == "true" || -n "$ENCRYPT_FLAG" ]]; then
             source "$ILMA_DIR/lib/backup/encrypt.sh"
             output_path="$([[ "$ENCRYPT_FLAG" == "true" ]] && echo "" || echo "$ENCRYPT_FLAG")"
+            # Override with --target if specified
+            if [[ -n "$OUTDIR_FLAG" && -z "$output_path" ]]; then
+                project_name="$(basename "$PROJECT_ROOT")"
+                output_path="$OUTDIR_FLAG/${project_name}$(get_archive_extension "$COMPRESSION_TYPE")${GPG_OUTPUT_EXTENSION:-.gpg}"
+            fi
             create_encrypted_archive "$PROJECT_ROOT" "$output_path"
             OPERATIONS_PERFORMED=true
             
@@ -475,6 +505,11 @@ case "$COMMAND" in
         if [[ "$CONTEXT_FLAG" == "true" || -n "$CONTEXT_FLAG" ]]; then
             source "$ILMA_DIR/lib/backup/context.sh"
             output_path="$([[ "$CONTEXT_FLAG" == "true" ]] && echo "" || echo "$CONTEXT_FLAG")"
+            # Override with --target if specified
+            if [[ -n "$OUTDIR_FLAG" && -z "$output_path" ]]; then
+                project_name="$(basename "$PROJECT_ROOT")"
+                output_path="$OUTDIR_FLAG/${project_name}.context"
+            fi
             create_context_only "$PROJECT_ROOT" "$output_path"
             OPERATIONS_PERFORMED=true
         fi

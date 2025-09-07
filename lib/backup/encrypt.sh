@@ -36,8 +36,24 @@ create_encrypted_archive() {
     done
 
     tar_args+=("--file=$temp_archive")
-    tar_args+=("-C" "$(dirname "$project_root")")
-    tar_args+=("$project_name")
+
+    # For single directory origins, avoid unnecessary nesting by archiving contents directly
+    # Check if this is a single directory target (not a working directory with .git, etc.)
+    local is_single_target=false
+    if [[ -d "$project_root" ]] && [[ ! -f "$project_root/.ilma.conf" ]] && [[ ! -d "$project_root/.git" ]]; then
+        # Appears to be a simple directory target rather than a project directory
+        is_single_target=true
+    fi
+
+    if [[ "$is_single_target" == "true" ]]; then
+        # Single directory case: archive contents directly to avoid nesting
+        tar_args+=("-C" "$project_root")
+        tar_args+=(".")
+    else
+        # Project directory or complex case: use encapsulating directory
+        tar_args+=("-C" "$(dirname "$project_root")")
+        tar_args+=("$project_name")
+    fi
 
     if ! tar "${tar_args[@]}"; then
         echo "Error: Failed to create temporary archive" >&2
