@@ -109,9 +109,7 @@ do_backup() {
             BACKUP_EXCLUDES+=(--exclude "$backup_basename/")
         fi
 
-        rsync -av --delete \
-             "${BACKUP_EXCLUDES[@]}" \
-             "$project_root/" "$MAIN_BACKUP_DIR/"
+        smart_copy "$project_root" "$MAIN_BACKUP_DIR" -av --delete "${BACKUP_EXCLUDES[@]}"
         echo "Main backup complete."
     }
 
@@ -134,7 +132,7 @@ do_backup() {
                     backup_dest="$XDG_BACKUP_DIR/$xdg_rel_path"
                     mkdir -p "$backup_dest"
 
-                    rsync -av "$project_xdg_dir/" "$backup_dest/$project_name/"
+                    smart_copy "$project_xdg_dir" "$backup_dest/$project_name" -av
                     echo "  - Backed up $project_xdg_dir"
                 fi
             done
@@ -164,9 +162,7 @@ do_backup() {
         CONTEXT_EXCLUDES=("--exclude" ".git/")
         FINAL_EXCLUDES=("${RSYNC_EXCLUDES[@]}" "${DYNAMIC_EXCLUDES[@]}" "${CONTEXT_EXCLUDES[@]}")
 
-        rsync -av --delete \
-            "${FINAL_EXCLUDES[@]}" \
-            "$project_root/" "$MIRROR_DIR/"
+        smart_copy "$project_root" "$MIRROR_DIR" -av --delete "${FINAL_EXCLUDES[@]}"
         echo "Context mirror created."
         echo
 

@@ -1,6 +1,9 @@
 #!/bin/bash
 # lib/backup/context.sh - Context-only operations
 
+# Source shared utility functions
+source "$ILMA_DIR/lib/functions.sh"
+
 # Unified path resolution for *_base_dir settings
 resolve_base_dir() {
     local base_dir="$1"
