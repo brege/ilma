@@ -1,6 +1,9 @@
 #!/bin/bash
 # lib/backup/encrypt.sh - Encryption operations
 
+# Source shared utility functions
+source "$ILMA_DIR/lib/functions.sh"
+
 # Encrypt-only operation (creates encrypted archive using pipeline)
 create_gpg() {
     local project_root="$1"
@@ -55,12 +58,25 @@ create_gpg() {
         tar_args+=("$project_name")
     fi
 
-    # Execute tar→gpg pipeline
-    if tar "${tar_args[@]}" | gpg --yes --batch --encrypt --recipient "$GPG_KEY_ID" --trust-model always --quiet -o "$output_path"; then
-        echo "Encrypted archive created: $output_path"
+    # Estimate total size for progress indication
+    local estimated_size=""
+    if command -v pv >/dev/null 2>&1; then
+        if [[ "$is_single_target" == "true" ]]; then
+            estimated_size=$(du -sb "$project_root" 2>/dev/null | cut -f1)
+        else
+            estimated_size=$(du -sb "$project_root" 2>/dev/null | cut -f1)
+        fi
+    fi
+
+    # Build tar and gpg command strings for pipeline execution
+    local tar_cmd="tar $(printf '%q ' "${tar_args[@]}")"
+    local gpg_cmd="gpg --yes --batch --encrypt --recipient '$GPG_KEY_ID' --trust-model always --quiet -o '$output_path'"
+
+    # Execute tar→gpg pipeline with progress indicator and compression ratio reporting
+    if execute_pipeline_with_progress "$estimated_size" "" "Error: Failed to create encrypted archive" "$tar_cmd" "$gpg_cmd"; then
+        format_compression_message "Encrypted archive created: $output_path" "$output_path" "$estimated_size"
         return 0
     else
-        echo "Error: Failed to create encrypted archive" >&2
         return 1
     fi
 }
@@ -140,12 +156,27 @@ create_multi_origin_gpg() {
         tar_args+=("$path")
     done
 
-    # Execute tar→gpg pipeline
-    if tar "${tar_args[@]}" | gpg --yes --batch --encrypt --recipient "$GPG_KEY_ID" --trust-model always --quiet -o "$output_path"; then
-        echo "Multi-origin encrypted archive created: $output_path"
+    # Estimate total size for progress indication
+    local estimated_size=""
+    if command -v pv >/dev/null 2>&1; then
+        estimated_size=0
+        for path in "${paths[@]}"; do
+            if [[ -e "$path" ]]; then
+                size=$(du -sb "$path" 2>/dev/null | cut -f1)
+                estimated_size=$((estimated_size + size))
+            fi
+        done
+    fi
+
+    # Build tar and gpg command strings for pipeline execution
+    local tar_cmd="tar $(printf '%q ' "${tar_args[@]}")"
+    local gpg_cmd="gpg --yes --batch --encrypt --recipient '$GPG_KEY_ID' --trust-model always --quiet -o '$output_path'"
+
+    # Execute tar→gpg pipeline with progress indicator and compression ratio reporting
+    if execute_pipeline_with_progress "$estimated_size" "" "Error: Failed to create encrypted archive" "$tar_cmd" "$gpg_cmd"; then
+        format_compression_message "Multi-origin encrypted archive created: $output_path" "$output_path" "$estimated_size"
         return 0
     else
-        echo "Error: Failed to create encrypted archive" >&2
         return 1
     fi
 }
