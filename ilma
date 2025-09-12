@@ -47,6 +47,7 @@ SCAN/PRUNE OPTIONS:
   --type TYPE                          Use project type configuration
   --pretty                             Show detailed output
   --verbose                            Show detailed output
+  --pattern PATTERN                    Override config with custom pattern (e.g. "*.json", "Trash")
   --bak                                Create backup then delete junk files
   --delete                             Delete junk files without backup
 
@@ -175,26 +176,41 @@ BASENAME_FLAG=""
 PROJECT_ROOT=""
 VERBOSE_FLAG=""
 PRETTY_FLAG=""
+STATS_FLAG=""
 BAK_FLAG=""
 DELETE_FLAG=""
+PATTERN_FLAG=""
 NO_EXTRACT_FLAG=""
 FORCE_FLAG=""
 OUTDIR_FLAG=""
 
-# First pass - scan all arguments to identify command
+# First pass - scan all arguments to identify command and check position
 COMMAND="backup"  # Default command
+COMMAND_POSITION=0
+CURRENT_POSITION=0
 for arg in "$@"; do
+    CURRENT_POSITION=$((CURRENT_POSITION + 1))
     case "$arg" in
         backup|console|scan|prune|config|decrypt|extract|validate)
             COMMAND="$arg"
+            COMMAND_POSITION=$CURRENT_POSITION
             break
             ;;
         --config)
             COMMAND="config"
+            COMMAND_POSITION=$CURRENT_POSITION
             break
             ;;
     esac
 done
+
+# Check if subcommand appears after options (position > 1 means options came first)
+if [[ $COMMAND_POSITION -gt 1 ]]; then
+    echo -e "Error: Subcommand '$COMMAND' must appear before options" >&2
+    echo -e "Correct: ilma $COMMAND [OPTIONS] [PATH]" >&2
+    echo -e "Invalid: ilma [OPTIONS] $COMMAND [PATH]" >&2
+    exit 1
+fi
 
 # Expand combined short flags (e.g., -abc becomes -a -b -c)
 # Special handling: -r requires an argument, so combinations with -r are not supported
@@ -321,7 +337,12 @@ else
                 echo "Error: --type requires an argument" >&2
                 exit 1
             fi
-            TYPE="$2"
+            # Support multiple types: accumulate with pipe separator
+            if [[ -n "$TYPE" ]]; then
+                TYPE="${TYPE}|${2}"
+            else
+                TYPE="$2"
+            fi
             shift 2
             ;;
         --verbose)
@@ -332,6 +353,10 @@ else
             PRETTY_FLAG="true"
             shift
             ;;
+        --stats=*)
+            STATS_FLAG="${1#--stats=}"
+            shift
+            ;;
         --bak)
             BAK_FLAG="true"
             shift
@@ -339,6 +364,14 @@ else
         --delete)
             DELETE_FLAG="true"
             shift
+            ;;
+        --pattern)
+            if [[ -z "${2:-}" ]]; then
+                echo "Error: --pattern requires an argument" >&2
+                exit 1
+            fi
+            PATTERN_FLAG="$2"
+            shift 2
             ;;
         --no-extract)
             NO_EXTRACT_FLAG="true"
@@ -365,7 +398,7 @@ else
             shift 2
             ;;
         backup|console|scan|prune|config|decrypt|extract)
-            # Skip command names
+            # Skip command names (already detected in first pass)
             shift
             ;;
         --help|-h)
@@ -619,14 +652,17 @@ case "$COMMAND" in
         show_console_summary "$PROJECT_ROOT"
         ;;
     scan)
-        # Load config without special mode handling for scan
-        source "$ILMA_DIR/commands/config.sh"
-        load_config "$PROJECT_ROOT" "$TYPE"
+        # Skip config loading for special multi-type cases - let scan.sh handle internally
+        if [[ "$TYPE" != "all" && ! "$TYPE" =~ \| ]]; then
+            source "$ILMA_DIR/commands/config.sh"
+            load_config "$PROJECT_ROOT" "$TYPE"
+        fi
 
         # Build arguments for scan.sh
         scan_args=()
         [[ -n "$TYPE" ]] && scan_args+=(--type "$TYPE")
         [[ "$PRETTY_FLAG" == "true" ]] && scan_args+=(--pretty)
+        [[ -n "$STATS_FLAG" ]] && scan_args+=(--stats="$STATS_FLAG")
         scan_args+=("$PROJECT_ROOT")
 
         # Call scan.sh directly
@@ -678,7 +714,7 @@ case "$COMMAND" in
         fi
 
         # Run prune analysis (and deletion if requested)
-        do_prune "$PROJECT_ROOT" "${VERBOSE_FLAG:-false}" "$TYPE" "$delete_mode"
+        do_prune "$PROJECT_ROOT" "${VERBOSE_FLAG:-false}" "$TYPE" "$delete_mode" "$PATTERN_FLAG"
 
         # Show stats after backup completion if backup was created
         if [[ "$BAK_FLAG" == "true" && "$CONFIG_FOUND" == "true" ]]; then

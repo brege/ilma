@@ -32,18 +32,23 @@ DEFAULT_TYPE=""
 TYPE="$DEFAULT_TYPE"
 DIR="."
 PRETTY_OUTPUT=false
+STATS_MODE=""
 
 usage() {
     cat <<EOF
 Usage: $0 [--type TYPE] [--pretty] [directory]
 
-  --type TYPE     Project type to use (required)
-                  Supported types: ${!types_map[*]}
+  --type TYPE     Project type to use (required if no local .ilma.conf)
+                  Supported types: ${!types_map[*]} all
+                  Multiple types: --type node --type python OR --type 'node|python'
   --pretty        Human-friendly output with colors and headers
   directory       Directory to scan for projects (default: current dir)
 
 This tool scans directories for projects and outputs junk file paths
-according to the selected TYPE's exclude patterns.
+according to the selected TYPE's exclude patterns or local .ilma.conf.
+
+Use --type all to scan with all available *-project.ilma.conf configs.
+Use multiple --type flags or pipe-separated values for combined patterns.
 
 Default: machine-readable paths only (safe for piping)
 With --pretty: human-friendly display with project context
@@ -68,6 +73,10 @@ while (( $# )); do
             PRETTY_OUTPUT=true
             shift
             ;;
+        --stats=*)
+            STATS_MODE="${1#--stats=}"
+            shift
+            ;;
         -h|--help)
             usage
             ;;
@@ -78,21 +87,53 @@ while (( $# )); do
     esac
 done
 
+CONFIG_FILE=""
+RSYNC_EXCLUDES=()
+
 if [[ -z "$TYPE" ]]; then
-    echo -e "${RED}Error:${RESET} --type is required"
-    echo "Supported types: ${!types_map[*]}"
-    exit 1
+    # No type specified - check for local .ilma.conf
+    if [[ -f "$DIR/.ilma.conf" ]]; then
+        # Load local config directly
+        source "$DIR/.ilma.conf"
+        CONFIG_FILE="$DIR/.ilma.conf (local)"
+    else
+        echo -e "${RED}Error:${RESET} --type is required when no local .ilma.conf found"
+        echo "Supported types: ${!types_map[*]} all"
+        exit 1
+    fi
+elif [[ "$TYPE" == "all" || "$TYPE" =~ \| ]]; then
+    # Special case: use all configs or multiple types (pipe-separated)
+    if [[ "$TYPE" == "all" ]]; then
+        CONFIG_FILE="all project configs"
+        # Use all *-project.ilma.conf configs
+        for config_path in "${types_map[@]}"; do
+            if [[ "$(basename "$config_path")" =~ -project\.ilma\.conf$ ]]; then
+                source "$config_path"
+            fi
+        done
+    else
+        # Handle pipe-separated types: node|python|latex
+        IFS='|' read -ra TYPES <<< "$TYPE"
+        CONFIG_FILE="multiple types: ${TYPES[*]}"
+        for single_type in "${TYPES[@]}"; do
+            if [[ -z "${types_map[$single_type]:-}" ]]; then
+                echo -e "${RED}Error:${RESET} Unsupported type '$single_type'"
+                echo "Supported types: ${!types_map[*]} all"
+                exit 1
+            fi
+            # Source each selected config
+            source "${types_map[$single_type]}"
+        done
+    fi
 elif [[ -z "${types_map[$TYPE]:-}" ]]; then
     echo -e "${RED}Error:${RESET} Unsupported type '$TYPE'"
-    echo "Supported types: ${!types_map[*]}"
+    echo "Supported types: ${!types_map[*]} all"
     exit 1
+else
+    # Type specified - use type config
+    CONFIG_FILE="${types_map[$TYPE]}"
+    source "$CONFIG_FILE"
 fi
-
-CONFIG_FILE="${types_map[$TYPE]}"
-
-# Load config
-RSYNC_EXCLUDES=()
-source "$CONFIG_FILE"
 
 # Parse exclude patterns
 JUNK_PATTERNS=()
@@ -167,7 +208,14 @@ for proj_dir in "${project_dirs[@]}"; do
     done
 
     if (( ${#all_junk[@]} > 0 )); then
-        if [[ "$PRETTY_OUTPUT" == "true" ]]; then
+        if [[ "$STATS_MODE" == "excludes" ]]; then
+            # Stats mode: count and summarize
+            source "$ILMA_DIR/lib/stats.sh"
+            echo -e "${RED}Found prunables:${RESET}"
+            for item in "${all_junk[@]}"; do
+                echo "$item"
+            done | count_excludes
+        elif [[ "$PRETTY_OUTPUT" == "true" ]]; then
             echo -e "  ${RED}WOULD DELETE:${RESET}"
             for item in "${all_junk[@]}"; do
                 echo "    $item"
