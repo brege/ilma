@@ -1,6 +1,9 @@
 #!/bin/bash
 # lib/backup/archive.sh - Archive-only operations
 
+# Source shared utility functions
+source "$ILMA_DIR/lib/functions.sh"
+
 # Unified path resolution for *_base_dir settings
 resolve_base_dir() {
     local base_dir="$1"
@@ -75,13 +78,21 @@ create_archive_only() {
         tar_args+=("$project_name")
     fi
 
-    if tar "${tar_args[@]}"; then
-        echo "Archive created: $output_path"
+    # Estimate total size for progress indication
+    local estimated_size=""
+    if command -v pv >/dev/null 2>&1; then
+        if [[ "$is_single_target" == "true" ]]; then
+            estimated_size=$(du -sb "$project_root" 2>/dev/null | cut -f1)
+        else
+            estimated_size=$(du -sb "$project_root" 2>/dev/null | cut -f1)
+        fi
+    fi
 
-
+    # Execute tar with progress indicator and compression ratio reporting
+    if execute_with_progress "$estimated_size" "" "Error: Failed to create archive" tar "${tar_args[@]}"; then
+        format_compression_message "Archive created: $output_path" "$output_path" "$estimated_size"
         return 0
     else
-        echo "Error: Failed to create archive" >&2
         return 1
     fi
 }
@@ -131,11 +142,23 @@ create_multi_origin_archive() {
         tar_args+=("$path")
     done
 
-    if tar "${tar_args[@]}"; then
-        echo "Multi-origin archive created: $output_path"
+    # Estimate total size for progress indication
+    local estimated_size=""
+    if command -v pv >/dev/null 2>&1; then
+        estimated_size=0
+        for path in "${paths[@]}"; do
+            if [[ -e "$path" ]]; then
+                size=$(du -sb "$path" 2>/dev/null | cut -f1)
+                estimated_size=$((estimated_size + size))
+            fi
+        done
+    fi
+
+    # Execute tar with progress indicator and compression ratio reporting
+    if execute_with_progress "$estimated_size" "" "Error: Failed to create multi-origin archive" tar "${tar_args[@]}"; then
+        format_compression_message "Multi-origin archive created: $output_path" "$output_path" "$estimated_size"
         return 0
     else
-        echo "Error: Failed to create multi-origin archive" >&2
         return 1
     fi
 }

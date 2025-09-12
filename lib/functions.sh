@@ -126,3 +126,143 @@ git-count-files() {
     done
   fi
 }
+
+# Execute command with progress bar if pv is available and file is large enough
+execute_with_progress() {
+    local estimated_size="$1"
+    local success_msg="$2"
+    local error_msg="$3"
+    shift 3
+    local command_args=("$@")
+
+    if command -v pv >/dev/null 2>&1 && [[ -n "$estimated_size" ]] && [[ "$estimated_size" -gt 1048576 ]]; then
+        # Use pv for files larger than 1MB - assumes command outputs to stdout
+        if "${command_args[@]}" | pv -s "$estimated_size" -p -t -e -r -b >/dev/null; then
+            echo "$success_msg"
+            return 0
+        else
+            echo "$error_msg" >&2
+            return 1
+        fi
+    else
+        # Fallback to regular command execution
+        if "${command_args[@]}"; then
+            echo "$success_msg"
+            return 0
+        else
+            echo "$error_msg" >&2
+            return 1
+        fi
+    fi
+}
+
+# Execute pipeline with progress bar if pv is available and file is large enough
+execute_pipeline_with_progress() {
+    local estimated_size="$1"
+    local success_msg="$2"
+    local error_msg="$3"
+    local first_cmd="$4"
+    local second_cmd="$5"
+
+    if command -v pv >/dev/null 2>&1 && [[ -n "$estimated_size" ]] && [[ "$estimated_size" -gt 1048576 ]]; then
+        # Use pv for files larger than 1MB
+        if eval "$first_cmd" | pv -s "$estimated_size" -p -t -e -r -b | eval "$second_cmd"; then
+            echo "$success_msg"
+            return 0
+        else
+            echo "$error_msg" >&2
+            return 1
+        fi
+    else
+        # Fallback to regular pipeline execution
+        if eval "$first_cmd" | eval "$second_cmd"; then
+            echo "$success_msg"
+            return 0
+        else
+            echo "$error_msg" >&2
+            return 1
+        fi
+    fi
+}
+
+# Calculate and format compression ratio message
+format_compression_message() {
+    local base_msg="$1"
+    local output_path="$2"
+    local estimated_size="$3"
+
+    if [[ -f "$output_path" && -n "$estimated_size" ]]; then
+        local final_size=$(stat -c%s "$output_path" 2>/dev/null)
+        if [[ -n "$final_size" && "$final_size" -gt 0 && "$estimated_size" -gt 0 ]]; then
+            local compression_ratio=$((100 - (final_size * 100 / estimated_size)))
+            echo "$base_msg (compressed by ${compression_ratio}%)"
+        else
+            echo "$base_msg"
+        fi
+    else
+        echo "$base_msg"
+    fi
+}
+
+# Smart copy function that detects filesystem capabilities and uses optimal method
+smart_copy() {
+    local source="$1"
+    local dest="$2"
+    shift 2
+    local rsync_args=("$@")
+
+    # Check for rsync-specific arguments that cp can't handle
+    local has_rsync_specific=false
+    for arg in "${rsync_args[@]}"; do
+        if [[ "$arg" =~ ^--(include|exclude|delete|archive|human-readable|itemize-changes) ]]; then
+            has_rsync_specific=true
+            break
+        fi
+    done
+
+    # Check if this is a local-to-local copy (both paths exist locally)
+    if [[ -d "$source" || -f "$source" ]] && [[ "$dest" != *:* ]] && [[ "$has_rsync_specific" == "false" ]]; then
+        # Local copy - check filesystem types
+        local source_fs dest_fs
+        source_fs=$(stat -f -c %T "$source" 2>/dev/null)
+        dest_fs=$(stat -f -c %T "$(dirname "$dest")" 2>/dev/null)
+
+        # If both are on same filesystem and filesystem supports optimization, use cp
+        if [[ "$source_fs" == "$dest_fs" ]] && [[ "$source_fs" =~ ^(btrfs|xfs|ext4|tmpfs)$ ]]; then
+            echo "Using optimized local copy (${source_fs})"
+
+            # Clean slate approach: rm + cp --reflink
+            if [[ -d "$dest" ]]; then
+                rm -rf "$dest"
+            fi
+
+            # Create parent directory if needed
+            mkdir -p "$(dirname "$dest")"
+
+            # Use cp with reflink for maximum performance
+            if cp -r --reflink=auto "$source" "$dest" 2>/dev/null; then
+                return 0
+            else
+                echo "Reflink copy failed, falling back to rsync"
+                smart_copy_rsync "$source" "$dest" "${rsync_args[@]}"
+            fi
+        else
+            # Different filesystems or unsupported - use rsync
+            smart_copy_rsync "$source" "$dest" "${rsync_args[@]}"
+        fi
+    else
+        # Remote copy or complex rsync args - always use rsync
+        smart_copy_rsync "$source" "$dest" "${rsync_args[@]}"
+    fi
+}
+
+# Rsync wrapper used as fallback or for remote operations
+smart_copy_rsync() {
+    local source="$1"
+    local dest="$2"
+    shift 2
+    local rsync_args=("$@")
+
+    echo "Using rsync"
+    rsync "${rsync_args[@]}" "$source/" "$dest/"
+}
