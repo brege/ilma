@@ -429,6 +429,11 @@ if [[ -z "$PROJECT_ROOT" ]]; then
     PROJECT_ROOT="$(pwd)"
 fi
 
+# Initialize ADDITIONAL_PATHS if not already set
+if [[ -z "${ADDITIONAL_PATHS+x}" ]]; then
+    ADDITIONAL_PATHS=()
+fi
+
 # Detect if PROJECT_ROOT is a file or directory
 IS_SINGLE_FILE=false
 if [[ "$COMMAND" != "decrypt" && "$COMMAND" != "extract" && "$COMMAND" != "validate" ]]; then
