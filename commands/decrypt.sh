@@ -101,9 +101,22 @@ extract_decrypted_archive() {
     echo "Safely extracting $archive_file to $target_dir/"
     mkdir -p "$target_dir"
 
+    # Preflight: list archive members and reject unsafe paths (absolute or ..)
+    local tar_option list_ok
+    tar_option=$(get_tar_option "$(get_compression_type_from_file "$archive_file")")
+    if [[ -n "$tar_option" ]]; then
+        if tar $tar_option -tf "$archive_file" | LC_ALL=C grep -E '(^/|(^|/)\.\.(\/|$))' -q; then
+            echo "Error: Unsafe archive entries detected (absolute paths or ..)" >&2
+            return 1
+        fi
+    else
+        if tar -tf "$archive_file" | LC_ALL=C grep -E '(^/|(^|/)\.\.(\/|$))' -q; then
+            echo "Error: Unsafe archive entries detected (absolute paths or ..)" >&2
+            return 1
+        fi
+    fi
+
     # Extract using same logic as extract command
-    local tar_option
-    tar_option=$(get_tar_option "$archive_file")
 
     if [[ -n "$tar_option" ]]; then
         tar $tar_option -xf "$archive_file" -C "$target_dir"
