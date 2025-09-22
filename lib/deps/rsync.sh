@@ -63,12 +63,41 @@ sync_to_remote() {
     # Verify remote file integrity
     echo "Verifying remote file integrity..."
     local remote_hash
-    remote_hash=$(ssh "$remote_server" '
-      f=$(basename "'"$remote_path"'"/"'"$local_file"'")
-      '"$hash_algorithm"'sum "$f"
-    ' | cut -d" " -f1)
+    local base_name
+    base_name="$(basename "$local_file")"
 
-    if [[ "$local_hash" == "$remote_hash" ]]; then
+    # Build a robust remote command: cd to path, then compute hash with fallbacks
+    # shellcheck disable=SC1078,SC1079,SC2027,SC2154
+    # - Prefer *sum tools; fall back to shasum/md5 on BSD/macOS
+    # - Quote variables carefully to avoid globbing and spaces issues
+    remote_hash=$(ssh "$remote_server" "bash -c '
+        set -e
+        cd -- "'"$remote_path"'"
+        f="'"$base_name"'"
+        algo="'"$hash_algorithm"'"
+        if command -v "${algo}sum" >/dev/null 2>&1; then
+            "${algo}sum" -- "$f" | awk '{print $1}'
+        else
+            case "$algo" in
+                sha256)
+                    if command -v shasum >/dev/null 2>&1; then shasum -a 256 -- "$f" | awk '{print $1}'; exit; fi
+                    if command -v openssl >/dev/null 2>&1; then openssl dgst -sha256 -- "$f" | awk '{print $2}'; exit; fi
+                    ;;
+                sha1)
+                    if command -v shasum >/dev/null 2>&1; then shasum -a 1 -- "$f" | awk '{print $1}'; exit; fi
+                    if command -v openssl >/dev/null 2>&1; then openssl dgst -sha1 -- "$f" | awk '{print $2}'; exit; fi
+                    ;;
+                md5)
+                    if command -v md5sum >/dev/null 2>&1; then md5sum -- "$f" | awk '{print $1}'; exit; fi
+                    if command -v md5 >/dev/null 2>&1; then md5 -q -- "$f" 2>/dev/null || md5 "$f" | awk '{print $NF}'; exit; fi
+                    if command -v openssl >/dev/null 2>&1; then openssl dgst -md5 -- "$f" | awk '{print $2}'; exit; fi
+                    ;;
+            esac
+            exit 127
+        fi
+    '")
+
+    if [[ -n "$remote_hash" && "$local_hash" == "$remote_hash" ]]; then
         echo "✓ Hash verification successful - remote file integrity confirmed"
         echo "Remote $hash_algorithm: $remote_hash"
 
@@ -87,7 +116,7 @@ sync_to_remote() {
     else
         echo "✗ Hash verification failed - remote file may be corrupted"
         echo "Local:  $local_hash"
-        echo "Remote: $remote_hash"
+        echo "Remote: ${remote_hash:-unavailable}"
         echo "Keeping local encrypted file for safety."
         return 1
     fi
