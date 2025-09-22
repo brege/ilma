@@ -59,6 +59,7 @@ DECRYPT/EXTRACT OPTIONS:
 GLOBAL OPTIONS:
   --target DIR                         Target directory for outputs
   --basename NAME                      Custom output filename (without extension)
+  --verify                             Verify outputs (archives/mirrors, local/remote)
   -h, --help                           Show this help
 
 PROJECT TYPES:
@@ -70,6 +71,8 @@ EXAMPLES:
   ilma --type latex                    Backup, ignoring common LaTeX cruft
   ilma -a                              Create compressed archive only
   ilma -e                              Create encrypted archive only
+  ilma -a --verify                     Create archive and verify contents
+  ilma -e --verify --remote srv:/dst   Encrypt, upload, and verify remote hash
   ilma -ar srv:/backup                 Archive and upload to remote server
   ilma -c ~/docs                       Create context mirror only
   ilma console                         Show project statistics
@@ -459,6 +462,12 @@ PROJECT_NAME="$(basename "$PROJECT_ROOT")"
 source "$ILMA_DIR/commands/config.sh"
 source "$ILMA_DIR/lib/deps/compression.sh"
 load_config "$PROJECT_ROOT" "$TYPE"
+# Apply config-driven verify default if flag not provided
+if [[ -z "$VERIFY_FLAG" ]]; then
+    if [[ "${VERIFY:-}" == "true" || "${VERIFY_DEFAULT:-false}" == "true" ]]; then
+        VERIFY_FLAG="true"
+    fi
+fi
 
 # Handle --config command early (before special modes)
 if [[ "$CONFIG_FLAG" == "true" || "$COMMAND" == "config" ]]; then

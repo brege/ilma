@@ -44,6 +44,7 @@ load_ini_config() {
                 hash.algorithm) HASH_ALGORITHM="$value" ;;
                 gpg.key_id) GPG_KEY_ID="$value" ;;
                 gpg.output_extension) GPG_OUTPUT_EXTENSION="$value" ;;
+                verify.enabled) VERIFY_DEFAULT="$value" ;;
             esac
         fi
     done < "$ini_file"
@@ -77,6 +78,7 @@ load_config() {
     HASH_ALGORITHM="sha256"
     GPG_KEY_ID=""
     GPG_OUTPUT_EXTENSION=".gpg"
+    VERIFY_DEFAULT=false
 
     # Load central config.ini first
     ILMA_DIR="$(dirname "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")")"
