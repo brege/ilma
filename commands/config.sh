@@ -31,6 +31,9 @@ load_ini_config() {
                 backup.create_compressed_archive) CREATE_COMPRESSED_ARCHIVE="$value" ;;
                 backup.max_archives) MAX_ARCHIVES="$value" ;;
                 backup.naming_strategy) VERSIONING="$value" ;;
+                backup.naming) VERSIONING="$value" ;;
+                backup.archive_naming) ARCHIVE_VERSIONING="$value" ;;
+                backup.encrypt_naming) ENCRYPT_VERSIONING="$value" ;;
                 backup.backup_xdg_dirs) BACKUP_XDG_DIRS="$value" ;;
                 backup.backup_base_dir) BACKUP_BASE_DIR="$value" ;;
                 backup.archive_base_dir) ARCHIVE_BASE_DIR="$value" ;;
@@ -58,6 +61,8 @@ load_config() {
     CREATE_COMPRESSED_ARCHIVE=false
     MAX_ARCHIVES=5
     VERSIONING="timestamp"
+    ARCHIVE_VERSIONING="timestamp"
+    ENCRYPT_VERSIONING="timestamp"
     BACKUP_XDG_DIRS=false
     XDG_PATHS=("$HOME/.config" "$HOME/.local/share" "$HOME/.cache")
     EXTENSIONS=(md txt)
@@ -75,8 +80,10 @@ load_config() {
 
     # Load central config.ini first
     ILMA_DIR="$(dirname "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")")"
+    CONFIG_FOUND=false
     if [[ -f "$ILMA_DIR/config.ini" ]]; then
         load_ini_config "$ILMA_DIR/config.ini"
+        CONFIG_FOUND=true
     fi
 
     # Load type-specific config if specified (for archive creation only)
@@ -95,7 +102,6 @@ load_config() {
     fi
 
     # Load project-local configuration (enables full pipeline)
-    CONFIG_FOUND=false
     if [[ -f "$project_root/.ilma.conf" ]]; then
         # First pass: check if PROJECT_TYPE is specified
         PROJECT_TYPE=""
@@ -222,6 +228,8 @@ show_config() {
         echo "  CREATE_COMPRESSED_ARCHIVE = $CREATE_COMPRESSED_ARCHIVE"
         echo "  MAX_ARCHIVES             = $MAX_ARCHIVES"
         echo "  VERSIONING   = $VERSIONING"
+        echo "  ARCHIVE_VERSIONING = $ARCHIVE_VERSIONING"
+        echo "  ENCRYPT_VERSIONING = $ENCRYPT_VERSIONING"
         echo "  BACKUP_XDG_DIRS          = $BACKUP_XDG_DIRS"
         echo "  EXTENSIONS               = (${EXTENSIONS[*]})"
     else

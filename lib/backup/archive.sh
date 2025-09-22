@@ -4,6 +4,53 @@
 # Source shared utility functions
 source "$ILMA_DIR/lib/functions.sh"
 
+# Archive path resolution with deduplication/versioning
+resolve_archive_path_with_deduplication() {
+    local base_path="$1"
+    local naming_strategy="${ARCHIVE_VERSIONING:-timestamp}"
+
+    # If file doesn't exist, use it as-is
+    if [[ ! -f "$base_path" ]]; then
+        echo "$base_path"
+        return
+    fi
+
+    case "$naming_strategy" in
+        "timestamp"|"force_timestamp")
+            local timestamp
+            timestamp="$(date '+%Y%m%d-%H%M%S')"
+            local archive_ext
+            archive_ext="$(get_archive_extension "$COMPRESSION_TYPE")"
+            local basename="${base_path%"$archive_ext"}"
+            echo "${basename}-${timestamp}${archive_ext}"
+            ;;
+        "numbered")
+            local counter=1
+            local archive_ext
+            archive_ext="$(get_archive_extension "$COMPRESSION_TYPE")"
+            local basename="${base_path%"$archive_ext"}"
+            local numbered_path="${basename}.${counter}${archive_ext}"
+            while [[ -f "$numbered_path" ]]; do
+                ((counter++))
+                numbered_path="${basename}.${counter}${archive_ext}"
+            done
+            echo "$numbered_path"
+            ;;
+        "overwrite")
+            echo "$base_path"
+            ;;
+        *)
+            # Default to timestamp
+            local timestamp
+            timestamp="$(date '+%Y%m%d-%H%M%S')"
+            local archive_ext
+            archive_ext="$(get_archive_extension "$COMPRESSION_TYPE")"
+            local basename="${base_path%"$archive_ext"}"
+            echo "${basename}-${timestamp}${archive_ext}"
+            ;;
+    esac
+}
+
 # Unified path resolution for *_base_dir settings
 resolve_base_dir() {
     local base_dir="$1"
@@ -36,8 +83,20 @@ create_archive_only() {
 
 
     if [[ -z "$output_path" ]]; then
-        # Default: create archive in parent directory
-        output_path="$(dirname "$project_root")/${project_name}$(get_archive_extension "$COMPRESSION_TYPE")"
+        # Default: create archive in parent directory with versioning
+        local base_output_path
+        base_output_path="$(dirname "$project_root")/${project_name}$(get_archive_extension "$COMPRESSION_TYPE")"
+        if [[ "$ARCHIVE_VERSIONING" == "force_timestamp" ]]; then
+            # Force timestamp even if file doesn't exist
+            local timestamp
+            timestamp="$(date '+%Y%m%d-%H%M%S')"
+            local archive_ext
+            archive_ext="$(get_archive_extension "$COMPRESSION_TYPE")"
+            local basename="${base_output_path%"$archive_ext"}"
+            output_path="${basename}-${timestamp}${archive_ext}"
+        else
+            output_path="$(resolve_archive_path_with_deduplication "$base_output_path")"
+        fi
     fi
 
     echo "Creating archive: $output_path"
@@ -110,9 +169,19 @@ create_multi_origin_archive() {
 
     # Generate output path if not provided
     if [[ -z "$output_path" ]]; then
-        local timestamp
-        timestamp="$(date '+%Y%m%d-%H%M%S')"
-        output_path="./multi-origin-${timestamp}$(get_archive_extension "$COMPRESSION_TYPE")"
+        local base_output_path
+        base_output_path="./multi-origin$(get_archive_extension "$COMPRESSION_TYPE")"
+        if [[ "$ARCHIVE_VERSIONING" == "force_timestamp" ]]; then
+            # Force timestamp even if file doesn't exist
+            local timestamp
+            timestamp="$(date '+%Y%m%d-%H%M%S')"
+            local archive_ext
+            archive_ext="$(get_archive_extension "$COMPRESSION_TYPE")"
+            local basename="${base_output_path%"$archive_ext"}"
+            output_path="${basename}-${timestamp}${archive_ext}"
+        else
+            output_path="$(resolve_archive_path_with_deduplication "$base_output_path")"
+        fi
     fi
 
     echo "Creating multi-origin archive: $output_path"
