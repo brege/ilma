@@ -192,9 +192,11 @@ format_compression_message() {
     local estimated_size="$3"
 
     if [[ -f "$output_path" && -n "$estimated_size" ]]; then
-        local final_size=$(stat -c%s "$output_path" 2>/dev/null)
+        local final_size
+        final_size=$(stat -c%s "$output_path" 2>/dev/null)
         if [[ -n "$final_size" && "$final_size" -gt 0 && "$estimated_size" -gt 0 ]]; then
-            local compression_ratio=$((100 - (final_size * 100 / estimated_size)))
+            local compression_ratio
+            compression_ratio=$((100 - (final_size * 100 / estimated_size)))
             echo "$base_msg (compressed by ${compression_ratio}%)"
         else
             echo "$base_msg"
@@ -232,19 +234,26 @@ smart_copy() {
             echo "Using optimized local copy (${source_fs})"
 
             # Clean slate approach: rm + cp --reflink
-            if [[ -d "$dest" ]]; then
+            # Safety: never remove a symlink path
+            if [[ -d "$dest" && ! -L "$dest" ]]; then
                 rm -rf "$dest"
             fi
 
             # Create parent directory if needed
             mkdir -p "$(dirname "$dest")"
 
-            # Use cp with reflink for maximum performance
-            if cp -r --reflink=auto "$source" "$dest" 2>/dev/null; then
-                return 0
+            # If source contains sockets, avoid cp and fall back to rsync
+            if find "$source" -type s -print -quit 2>/dev/null | grep -q .; then
+                echo "Sockets detected in source; using rsync without specials/devices"
+                smart_copy_rsync "$source" "$dest" "${rsync_args[@]}" --no-specials --no-devices
             else
-                echo "Reflink copy failed, falling back to rsync"
-                smart_copy_rsync "$source" "$dest" "${rsync_args[@]}"
+                # Use cp with reflink for maximum performance
+                if cp -r --reflink=auto "$source" "$dest" 2>/dev/null; then
+                    return 0
+                else
+                    echo "Reflink copy failed, falling back to rsync"
+                    smart_copy_rsync "$source" "$dest" "${rsync_args[@]}"
+                fi
             fi
         else
             # Different filesystems or unsupported - use rsync
@@ -264,5 +273,17 @@ smart_copy_rsync() {
     local rsync_args=("$@")
 
     echo "Using rsync"
+    # Default to skipping devices/specials unless caller explicitly opted in
+    local have_devices=false have_specials=false
+    for a in "${rsync_args[@]}"; do
+        [[ "$a" == "--devices" ]] && have_devices=true
+        [[ "$a" == "--specials" ]] && have_specials=true
+    done
+    if [[ "$have_devices" == false ]]; then
+        rsync_args+=("--no-devices")
+    fi
+    if [[ "$have_specials" == false ]]; then
+        rsync_args+=("--no-specials")
+    fi
     rsync "${rsync_args[@]}" "$source/" "$dest/"
 }

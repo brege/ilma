@@ -90,6 +90,10 @@ extract_decrypted_archive() {
     if [[ -e "$target_dir" ]]; then
         if [[ "$force_flag" == "true" ]]; then
             echo "Removing existing directory: $target_dir"
+            if [[ -L "$target_dir" ]]; then
+                echo "Error: Refusing to remove symlink target: $target_dir" >&2
+                return 1
+            fi
             rm -rf "$target_dir"
         else
             echo "Error: Target directory already exists: $target_dir"
