@@ -183,6 +183,7 @@ PATTERN_FLAG=""
 NO_EXTRACT_FLAG=""
 FORCE_FLAG=""
 OUTDIR_FLAG=""
+VERIFY_FLAG=""
 
 # First pass - scan all arguments to identify command and check position
 COMMAND="backup"  # Default command
@@ -381,6 +382,10 @@ else
             FORCE_FLAG="true"
             shift
             ;;
+        --verify)
+            VERIFY_FLAG="true"
+            shift
+            ;;
         --target)
             if [[ -z "${2:-}" ]]; then
                 echo "Error: --target requires a directory path" >&2
@@ -506,6 +511,11 @@ case "$COMMAND" in
                 do_backup "$PROJECT_ROOT"
             fi
             OPERATIONS_PERFORMED=true
+            # Optional verification for backup mirror
+            if [[ "$VERIFY_FLAG" == "true" ]]; then
+                source "$ILMA_DIR/lib/validation/verify.sh"
+                verify_mirror_integrity "$PROJECT_ROOT" "$MAIN_BACKUP_DIR" || true
+            fi
         fi
         
         # Archive operation
@@ -555,7 +565,7 @@ case "$COMMAND" in
                             # Force timestamp even if file doesn't exist
                             timestamp="$(date '+%Y%m%d-%H%M%S')"
                             archive_ext="$(get_archive_extension "$COMPRESSION_TYPE")"
-                            basename_path="${base_output_path%$archive_ext}"
+                            basename_path="${base_output_path%"$archive_ext"}"
                             output_path="${basename_path}-${timestamp}${archive_ext}"
                         else
                             output_path="$(resolve_archive_path_with_deduplication "$base_output_path")"
@@ -575,6 +585,28 @@ case "$COMMAND" in
                 archive_file="$output_path"
                 [[ -z "$archive_file" ]] && archive_file="$(dirname "$PROJECT_ROOT")/$(basename "$PROJECT_ROOT")$(get_archive_extension "$COMPRESSION_TYPE")"
                 sync_archive_to_remote "$archive_file" "$REMOTE_FLAG"
+            fi
+            # Optional verification for archive
+            if [[ "$VERIFY_FLAG" == "true" ]]; then
+                source "$ILMA_DIR/lib/validation/verify.sh"
+                # Determine final archive path
+                final_archive="$output_path"
+                if [[ -z "$final_archive" ]]; then
+                    parent_dir="$(dirname "$PROJECT_ROOT")"
+                    base_name="$(basename "$PROJECT_ROOT")"
+                    ext="$(get_archive_extension "$COMPRESSION_TYPE")"
+                    mapfile -t candidates < <(ls -1t "$parent_dir"/"$base_name"-*"$ext" 2>/dev/null || true)
+                    if [[ ${#candidates[@]} -gt 0 ]]; then final_archive="${candidates[0]}"; fi
+                fi
+                if [[ -n "$final_archive" && -f "$final_archive" ]]; then
+                    verify_archive_against_dir "$final_archive" "$PROJECT_ROOT" "$(basename "$PROJECT_ROOT")" || true
+                    if [[ -n "$REMOTE_FLAG" ]]; then
+                        remote_server="${REMOTE_FLAG%%:*}"
+                        remote_path="${REMOTE_FLAG#*:}"
+                        : "${HASH_ALGORITHM:=sha256}"
+                        verify_remote_file_hash "$final_archive" "$remote_server" "$remote_path" "$HASH_ALGORITHM" || true
+                    fi
+                fi
             fi
         fi
         
@@ -628,6 +660,19 @@ case "$COMMAND" in
                 [[ -z "$encrypted_file" ]] && encrypted_file="$(dirname "$PROJECT_ROOT")/$(basename "$PROJECT_ROOT")$(get_archive_extension "$COMPRESSION_TYPE").gpg"
                 sync_archive_to_remote "$encrypted_file" "$REMOTE_FLAG"
             fi
+            if [[ "$VERIFY_FLAG" == "true" ]]; then
+                source "$ILMA_DIR/lib/validation/verify.sh"
+                final_enc="$output_path"
+                if [[ -n "$final_enc" && -f "$final_enc" ]]; then
+                    echo "Local encrypted hash (sha256): $(sha256sum "$final_enc" | awk '{print $1}')"
+                fi
+                if [[ -n "$REMOTE_FLAG" && -n "$final_enc" ]]; then
+                    remote_server="${REMOTE_FLAG%%:*}"
+                    remote_path="${REMOTE_FLAG#*:}"
+                    : "${HASH_ALGORITHM:=sha256}"
+                    verify_remote_file_hash "$final_enc" "$remote_server" "$remote_path" "$HASH_ALGORITHM" || true
+                fi
+            fi
         fi
         
         # Context operation
@@ -641,6 +686,15 @@ case "$COMMAND" in
             fi
             create_context_only "$PROJECT_ROOT" "$output_path"
             OPERATIONS_PERFORMED=true
+            if [[ "$VERIFY_FLAG" == "true" ]]; then
+                source "$ILMA_DIR/lib/validation/verify.sh"
+                final_context="$output_path"
+                if [[ -z "$final_context" ]]; then
+                    source "$ILMA_DIR/lib/backup/context.sh"
+                    final_context=$(resolve_base_dir "$CONTEXT_BASE_DIR" "$PROJECT_ROOT" "$(basename "$PROJECT_ROOT")" ".context")
+                fi
+                verify_mirror_integrity "$PROJECT_ROOT" "$final_context" || true
+            fi
         fi
         
         # Remote sync operation (for non-archive files)
