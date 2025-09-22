@@ -67,35 +67,35 @@ sync_to_remote() {
     base_name="$(basename "$local_file")"
 
     # Build a robust remote command: cd to path, then compute hash with fallbacks
-    # shellcheck disable=SC1078,SC1079,SC2027,SC2154
-    # - Prefer *sum tools; fall back to shasum/md5 on BSD/macOS
-    # - Quote variables carefully to avoid globbing and spaces issues
-    remote_hash=$(ssh "$remote_server" "bash -c '
-        set -e
-        cd -- "'"$remote_path"'"
-        f="'"$base_name"'"
-        algo="'"$hash_algorithm"'"
-        if command -v "${algo}sum" >/dev/null 2>&1; then
-            "${algo}sum" -- "$f" | awk '{print $1}'
-        else
-            case "$algo" in
-                sha256)
-                    if command -v shasum >/dev/null 2>&1; then shasum -a 256 -- "$f" | awk '{print $1}'; exit; fi
-                    if command -v openssl >/dev/null 2>&1; then openssl dgst -sha256 -- "$f" | awk '{print $2}'; exit; fi
-                    ;;
-                sha1)
-                    if command -v shasum >/dev/null 2>&1; then shasum -a 1 -- "$f" | awk '{print $1}'; exit; fi
-                    if command -v openssl >/dev/null 2>&1; then openssl dgst -sha1 -- "$f" | awk '{print $2}'; exit; fi
-                    ;;
-                md5)
-                    if command -v md5sum >/dev/null 2>&1; then md5sum -- "$f" | awk '{print $1}'; exit; fi
-                    if command -v md5 >/dev/null 2>&1; then md5 -q -- "$f" 2>/dev/null || md5 "$f" | awk '{print $NF}'; exit; fi
-                    if command -v openssl >/dev/null 2>&1; then openssl dgst -md5 -- "$f" | awk '{print $2}'; exit; fi
-                    ;;
-            esac
-            exit 127
-        fi
-    '")
+    remote_hash=$(ssh "$remote_server" bash -s -- "$remote_path" "$base_name" "$hash_algorithm" << 'REMOTE_HASH_SH'
+set -e
+remote_path="$1"
+file="$2"
+algo="$3"
+cd -- "$remote_path"
+if command -v "${algo}sum" >/dev/null 2>&1; then
+  "${algo}sum" -- "$file" | awk '{print $1}'
+else
+  case "$algo" in
+    sha256)
+      if command -v shasum >/dev/null 2>&1; then shasum -a 256 -- "$file" | awk '{print $1}'; exit; fi
+      if command -v openssl >/dev/null 2>&1; then openssl dgst -sha256 -- "$file" | awk '{print $2}'; exit; fi
+      ;;
+    sha1)
+      if command -v shasum >/dev/null 2>&1; then shasum -a 1 -- "$file" | awk '{print $1}'; exit; fi
+      if command -v openssl >/dev/null 2>&1; then openssl dgst -sha1 -- "$file" | awk '{print $2}'; exit; fi
+      ;;
+    md5)
+      if command -v md5sum >/dev/null 2>&1; then md5sum -- "$file" | awk '{print $1}'; exit; fi
+      if command -v md5 >/dev/null 2>&1; then md5 -q -- "$file" 2>/dev/null || md5 "$file" | awk '{print $NF}'; exit; fi
+      if command -v openssl >/dev/null 2>&1; then openssl dgst -md5 -- "$file" | awk '{print $2}'; exit; fi
+      ;;
+  esac
+  exit 127
+fi
+REMOTE_HASH_SH
+)
+
 
     if [[ -n "$remote_hash" && "$local_hash" == "$remote_hash" ]]; then
         echo "✓ Hash verification successful - remote file integrity confirmed"
