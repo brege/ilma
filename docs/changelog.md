@@ -4,6 +4,22 @@ recent development work on ilma backup/archive tool, roughly chronological
 
 ## september 2025
 
+### 2025-09-22 verification + extraction hardening
+- Added `--verify` flag (and config defaults) to validate outputs:
+  - Archives: tar diff against source; with `--remote`, compare remote
+    hash to local.
+  - Encrypted archives: print local hash; with `--remote`, compare
+    remote vs local encrypted hash.
+  - Mirrors (-b/-c): rsync checksum dry-run to confirm integrity.
+- Safe extraction preflight: reject archives containing absolute paths
+  or `..` entries before extraction, and reorder logs so the "Safely
+  extracting" line appears only after preflight passes.
+- Remote hash verification helpers with BSD/macOS fallbacks (shasum /
+  openssl) using robust quoting/cd semantics.
+- Config: global `[verify] enabled = false` and per-project
+  `VERIFY=true` support; README examples updated.
+- ShellCheck and quoting fixes around archive naming and tar options.
+
 ### 2025-09-06 short forms and multiple operations
 - added short flags: `-a` archive, `-b` backup, `-c` context, `-e` encrypt, `-r` remote
 - multi-operation support: `ilma -aec` creates archive, context, and encrypted versions in one run
