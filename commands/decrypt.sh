@@ -98,9 +98,6 @@ extract_decrypted_archive() {
         fi
     fi
 
-    echo "Safely extracting $archive_file to $target_dir/"
-    mkdir -p "$target_dir"
-
     # Preflight: list archive members and reject unsafe paths (absolute or ..)
     local tar_option list_ok
     tar_option=$(get_tar_option "$(get_compression_type_from_file "$archive_file")")
@@ -115,6 +112,9 @@ extract_decrypted_archive() {
             return 1
         fi
     fi
+
+    echo "Safely extracting $archive_file to $target_dir/"
+    mkdir -p "$target_dir"
 
     # Extract using same logic as extract command
 
