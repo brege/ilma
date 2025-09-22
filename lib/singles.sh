@@ -59,23 +59,36 @@ do_single_file_backup() {
 # Handle single file encryption: file -> file.gpg
 do_single_file_encryption() {
     local file_path="$1"
-    local output_file="${file_path}.gpg"
+    local output_file="${file_path}${GPG_OUTPUT_EXTENSION:-.gpg}"
 
-    # If output already exists, use naming strategy for uniqueness
+    # Check if this exact file has already been encrypted by comparing checksums
     if [[ -f "$output_file" ]]; then
-        local naming_strategy="${VERSIONING:-timestamp}"
+        # Check if the source file content matches what's already encrypted
+        local source_hash existing_hash
+        source_hash=$(sha256sum "$file_path" | cut -d' ' -f1)
+        if command -v gpg >/dev/null 2>&1; then
+            existing_hash=$(gpg --decrypt "$output_file" 2>/dev/null | sha256sum | cut -d' ' -f1)
+            if [[ "$source_hash" == "$existing_hash" ]]; then
+                echo "File already encrypted with identical content: $output_file"
+                echo "Skipping encryption to avoid duplicate."
+                return 0
+            fi
+        fi
+
+        # If content differs or we can't decrypt, use naming strategy for uniqueness
+        local naming_strategy="${ENCRYPT_VERSIONING:-timestamp}"
         case "$naming_strategy" in
-            "timestamp")
+            "timestamp"|"force_timestamp")
                 local timestamp
                 timestamp="$(date '+%Y%m%d-%H%M%S')"
-                output_file="${file_path}-${timestamp}.gpg"
+                output_file="${file_path}-${timestamp}${GPG_OUTPUT_EXTENSION:-.gpg}"
                 ;;
             "numbered")
                 local counter=1
-                local numbered_output="${file_path}.${counter}.gpg"
+                local numbered_output="${file_path}.${counter}${GPG_OUTPUT_EXTENSION:-.gpg}"
                 while [[ -f "$numbered_output" ]]; do
                     ((counter++))
-                    numbered_output="${file_path}.${counter}.gpg"
+                    numbered_output="${file_path}.${counter}${GPG_OUTPUT_EXTENSION:-.gpg}"
                 done
                 output_file="$numbered_output"
                 ;;

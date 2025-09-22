@@ -536,15 +536,33 @@ case "$COMMAND" in
                 # Single origin archive
                 # Build output path with --target and --basename
                 if [[ -z "$output_path" ]]; then
-                    if [[ -n "$BASENAME_FLAG" ]]; then
-                        basename="$BASENAME_FLAG"
+                    # Check if we need custom naming or can let archive.sh handle it
+                    if [[ -n "$BASENAME_FLAG" || -n "$OUTDIR_FLAG" ]]; then
+                        # Custom basename or outdir - build path manually then apply timestamp logic
+                        if [[ -n "$BASENAME_FLAG" ]]; then
+                            basename="$BASENAME_FLAG"
+                        else
+                            basename="$(basename "$PROJECT_ROOT")"
+                        fi
+                        if [[ -n "$OUTDIR_FLAG" ]]; then
+                            base_output_path="$OUTDIR_FLAG/${basename}$(get_archive_extension "$COMPRESSION_TYPE")"
+                        else
+                            base_output_path="$(dirname "$PROJECT_ROOT")/${basename}$(get_archive_extension "$COMPRESSION_TYPE")"
+                        fi
+                        # Apply timestamp/versioning logic to custom path
+                        source "$ILMA_DIR/lib/backup/archive.sh"
+                        if [[ "$ARCHIVE_VERSIONING" == "force_timestamp" ]]; then
+                            # Force timestamp even if file doesn't exist
+                            timestamp="$(date '+%Y%m%d-%H%M%S')"
+                            archive_ext="$(get_archive_extension "$COMPRESSION_TYPE")"
+                            basename_path="${base_output_path%$archive_ext}"
+                            output_path="${basename_path}-${timestamp}${archive_ext}"
+                        else
+                            output_path="$(resolve_archive_path_with_deduplication "$base_output_path")"
+                        fi
                     else
-                        basename="$(basename "$PROJECT_ROOT")"
-                    fi
-                    if [[ -n "$OUTDIR_FLAG" ]]; then
-                        output_path="$OUTDIR_FLAG/${basename}$(get_archive_extension "$COMPRESSION_TYPE")"
-                    else
-                        output_path="$(dirname "$PROJECT_ROOT")/${basename}$(get_archive_extension "$COMPRESSION_TYPE")"
+                        # No custom flags - let archive.sh handle path resolution with timestamp logic
+                        output_path=""
                     fi
                 fi
                 create_archive_only "$PROJECT_ROOT" "$output_path"
