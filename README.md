@@ -137,6 +137,8 @@ See **[`configs/`](./configs)** for common language presets.
 cd /path/to/project
 ilma                             # Backup current directory
 ilma [PROJECT_PATH]              # Backup specified directory
+ilma -a --verify                 # Archive and verify contents
+ilma -e --verify --remote srv:/dst  # Encrypt, upload, and verify remote hash
 ```
 
 ### Analysis & Statistics

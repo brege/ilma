@@ -104,6 +104,13 @@ EXTENSIONS=(
 #COMPRESSION_LEVEL="3"                  # Override global compression level for this project
 
 # =============================================================================
+# VERIFICATION DEFAULTS
+# =============================================================================
+
+# Enable verification for this project (archives/mirrors). Equivalent to --verify.
+#VERIFY=true
+
+# =============================================================================
 # ENCRYPTION (GPG) - override global config.ini
 # =============================================================================
 
