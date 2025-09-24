@@ -12,7 +12,7 @@ Portability
 - [ ] No unguarded GNU-only calls (`readlink -f`, `stat -f -c`, `cp --reflink`)
 - [ ] Hash tools work on macOS (shasum/md5/openssl) and GNU (*sum)
 - [ ] Paths/args consistently quoted; rsync trailing slashes intentional
- - [x] Sockets/devices skipped by default in rsync paths
+- [x] Sockets/devices skipped by default in rsync paths
 
 Maintainability
 - [x] ShellCheck clean for changed files
