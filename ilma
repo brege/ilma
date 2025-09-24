@@ -592,7 +592,19 @@ case "$COMMAND" in
             if [[ -n "$REMOTE_FLAG" ]]; then
                 source "$ILMA_DIR/lib/backup/remote.sh"
                 archive_file="$output_path"
-                [[ -z "$archive_file" ]] && archive_file="$(dirname "$PROJECT_ROOT")/$(basename "$PROJECT_ROOT")$(get_archive_extension "$COMPRESSION_TYPE")"
+                if [[ -z "$archive_file" || ! -f "$archive_file" ]]; then
+                    # Auto-detected name case: pick the newest timestamped variant if present
+                    parent_dir="$(dirname "$PROJECT_ROOT")"
+                    base_name="$(basename "$PROJECT_ROOT")"
+                    ext="$(get_archive_extension "$COMPRESSION_TYPE")"
+                    mapfile -t candidates < <(ls -1t "$parent_dir"/"$base_name"-*"$ext" 2>/dev/null || true)
+                    if [[ ${#candidates[@]} -gt 0 ]]; then
+                        archive_file="${candidates[0]}"
+                    else
+                        # Fallback to non-timestamped name
+                        archive_file="$parent_dir/$base_name$ext"
+                    fi
+                fi
                 sync_archive_to_remote "$archive_file" "$REMOTE_FLAG"
             fi
             # Optional verification for archive
@@ -666,7 +678,20 @@ case "$COMMAND" in
             if [[ -n "$REMOTE_FLAG" ]]; then
                 source "$ILMA_DIR/lib/backup/remote.sh"
                 encrypted_file="$output_path"
-                [[ -z "$encrypted_file" ]] && encrypted_file="$(dirname "$PROJECT_ROOT")/$(basename "$PROJECT_ROOT")$(get_archive_extension "$COMPRESSION_TYPE").gpg"
+                if [[ -z "$encrypted_file" || ! -f "$encrypted_file" ]]; then
+                    parent_dir="$(dirname "$PROJECT_ROOT")"
+                    base_name="$(basename "$PROJECT_ROOT")"
+                    arch_ext="$(get_archive_extension "$COMPRESSION_TYPE")"
+                    gpg_ext="${GPG_OUTPUT_EXTENSION:-.gpg}"
+                    # Try newest timestamped variant first
+                    mapfile -t candidates < <(ls -1t "$parent_dir"/"$base_name"-*"$arch_ext""$gpg_ext" 2>/dev/null || true)
+                    if [[ ${#candidates[@]} -gt 0 ]]; then
+                        encrypted_file="${candidates[0]}"
+                    else
+                        # Fallback to non-timestamped combined extension
+                        encrypted_file="$parent_dir/$base_name$arch_ext$gpg_ext"
+                    fi
+                fi
                 sync_archive_to_remote "$encrypted_file" "$REMOTE_FLAG"
             fi
             if [[ "$VERIFY_FLAG" == "true" ]]; then
