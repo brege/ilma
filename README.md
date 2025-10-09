@@ -115,7 +115,7 @@ cp config.example.ini config.ini
 #### Per-Project
 
 Create **`.ilma.conf`** in any project for custom strategies.
-See **[`configs/dot-ilma.conf.example`](./configs/dot-ilma.conf.example)** for a kitchen sink example.
+See **[`configs/local/dot-ilma.conf.example`](./configs/local/dot-ilma.conf.example)** for a kitchen sink example.
 
 ---
 
@@ -239,7 +239,7 @@ project.bak/                     # Main backup directory
 ### Configuration Inheritance
 **ilma** uses a hierarchical configuration system:
 1. **Global defaults** from `config.ini`, currently at **ilma's repo root**
-2. **Project type config** (e.g., `configs/python-project.ilma.conf`) 
+2. **Project type config** (e.g., `configs/projects/python.ilma.conf`) 
 3. **Local overrides** from `.ilma.conf`
 
 ## License

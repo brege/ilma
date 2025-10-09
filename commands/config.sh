@@ -30,7 +30,6 @@ load_ini_config() {
                 compression.level) COMPRESSION_LEVEL="$value" ;;
                 backup.create_compressed_archive) CREATE_COMPRESSED_ARCHIVE="$value" ;;
                 backup.max_archives) MAX_ARCHIVES="$value" ;;
-                backup.naming_strategy) VERSIONING="$value" ;;
                 backup.naming) VERSIONING="$value" ;;
                 backup.archive_naming) ARCHIVE_VERSIONING="$value" ;;
                 backup.encrypt_naming) ENCRYPT_VERSIONING="$value" ;;
@@ -50,7 +49,6 @@ load_ini_config() {
     done < "$ini_file"
 }
 
-# Load configuration with type support and fallback handling
 load_config() {
     local project_root="$1"
     local type="${2:-}"
@@ -91,12 +89,9 @@ load_config() {
     # Load type-specific config if specified (for archive creation only)
     TYPE_CONFIG_LOADED=false
     if [[ -n "$type" ]]; then
-        local type_config="$ILMA_DIR/configs/${type}-project.ilma.conf"
+        local type_config="$ILMA_DIR/configs/projects/${type}.ilma.conf"
         if [[ -f "$type_config" ]]; then
             source "$type_config"
-            TYPE_CONFIG_LOADED=true
-        elif [[ -f "$ILMA_DIR/configs/${type}.ilma.conf" ]]; then
-            source "$ILMA_DIR/configs/${type}.ilma.conf"
             TYPE_CONFIG_LOADED=true
         else
             echo "Warning: Configuration type '$type' not found, using defaults" >&2
@@ -111,11 +106,9 @@ load_config() {
 
         # If PROJECT_TYPE is set, load that type config first
         if [[ -n "$PROJECT_TYPE" ]]; then
-            local type_config="$ILMA_DIR/configs/${PROJECT_TYPE}-project.ilma.conf"
+            local type_config="$ILMA_DIR/configs/projects/${PROJECT_TYPE}.ilma.conf"
             if [[ -f "$type_config" ]]; then
                 source "$type_config"
-            elif [[ -f "$ILMA_DIR/configs/${PROJECT_TYPE}.ilma.conf" ]]; then
-                source "$ILMA_DIR/configs/${PROJECT_TYPE}.ilma.conf"
             else
                 echo "Warning: PROJECT_TYPE '$PROJECT_TYPE' not found in configs/" >&2
             fi

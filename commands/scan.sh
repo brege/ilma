@@ -20,11 +20,7 @@ declare -A types_map=()
 for cf in "${config_files[@]}"; do
     basefile="$(basename "$cf")"
     name="${basefile%.ilma.conf}"
-    if [[ "$name" =~ ^(.+)-project$ ]]; then
-        short_name="${BASH_REMATCH[1]}"
-    else
-        short_name="$name"
-    fi
+    short_name="$name"
     types_map["$short_name"]="$cf"
 done
 
@@ -47,7 +43,7 @@ Usage: $0 [--type TYPE] [--pretty] [directory]
 This tool scans directories for projects and outputs junk file paths
 according to the selected TYPE's exclude patterns or local .ilma.conf.
 
-Use --type all to scan with all available *-project.ilma.conf configs.
+Use --type all to scan with all available \$project.ilma.conf configs.
 Use multiple --type flags or pipe-separated values for combined patterns.
 
 Default: machine-readable paths only (safe for piping)

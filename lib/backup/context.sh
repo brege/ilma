@@ -71,7 +71,7 @@ create_context_only() {
         # Always exclude .git directory in context mirrors (version control metadata not needed for LLMs)
         rsync_args+=("--exclude=.git/")
         # Load and combine exclusions from all project config files
-        for config_file in "$ILMA_DIR"/configs/*-project.ilma.conf; do
+        for config_file in "$ILMA_DIR"/configs/projects/*.ilma.conf; do
             if [[ -f "$config_file" ]]; then
                 # Source the config in a subshell to extract RSYNC_EXCLUDES
                 local temp_excludes=()
