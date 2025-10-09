@@ -7,7 +7,7 @@
 # =============================================================================
 
 # Inherit settings from a project type config (python, node, latex, bash, etc.)
-# This loads configs/TYPE-project.ilma.conf first, then applies overrides below
+# This loads configs/projects/TYPE.ilma.conf first, then applies overrides below
 #PROJECT_TYPE="bash"
 
 # ARRAY OVERRIDE PATTERNS:
@@ -15,7 +15,7 @@
 # - THING+=(new stuff) -> Append to inherited arrays  
 # - THING=""           -> Disable feature entirely
 #
-# Example: Override bash-project.ilma.conf excludes with your own:
+# Example: Override bash.ilma.conf excludes with your own:
 # RSYNC_EXCLUDES=()                    # Clear bash defaults
 # RSYNC_EXCLUDES+=(                    # Add only your excludes
 #     --exclude 'cluster-jobs/'

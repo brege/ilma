@@ -120,7 +120,7 @@ verify_mirror_integrity() {
         return 1
     fi
 
-    local args=("-rcn" "--delete")
+    local args=("-rcn" "--delete" "-l")
     for exclude in "${RSYNC_EXCLUDES[@]}"; do
         if [[ "$exclude" == --exclude* ]]; then
             args+=("$exclude")

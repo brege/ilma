@@ -33,10 +33,8 @@ if [[ -n "${PROJECT_TYPE:-}" ]]; then
     SCRIPT_DIR="$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")"
     ILMA_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
 
-    type_config="$ILMA_DIR/configs/${PROJECT_TYPE}-project.ilma.conf"
+    type_config="$ILMA_DIR/configs/projects/${PROJECT_TYPE}.ilma.conf"
     if [[ -f "$type_config" ]]; then
-        echo "PASS:PROJECT_TYPE inheritance ($PROJECT_TYPE)"
-    elif [[ -f "$ILMA_DIR/configs/${PROJECT_TYPE}.ilma.conf" ]]; then
         echo "PASS:PROJECT_TYPE inheritance ($PROJECT_TYPE)"
     else
         echo "FAIL:PROJECT_TYPE inheritance:Type config for '$PROJECT_TYPE' not found"

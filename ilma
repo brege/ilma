@@ -16,7 +16,7 @@ HELP_COMMAND=""
 for arg in "$@"; do
     if [[ "$arg" == "--help" || "$arg" == "-h" ]]; then
         HELP_REQUESTED=true
-    elif [[ "$arg" =~ ^(backup|console|scan|prune|config|decrypt|extract|validate)$ ]]; then
+    elif [[ "$arg" =~ ^(backup|console|scan|prune|config|decrypt|extract|validate|remote|pull)$ ]]; then
         HELP_COMMAND="$arg"
     fi
 done
@@ -35,6 +35,8 @@ COMMANDS:
   validate                             Validate configuration and connectivity
   decrypt                              Decrypt GPG-encrypted archive
   extract                              Safely extract archive (prevents tarbombs)
+  pull                                 Run remote pull jobs (alias of `remote pull`)
+  remote                               Run remote pull jobs (stage + backup)
 
 BACKUP OPTIONS:
   -b, --backup [OUTPUT_PATH]           Create backup directory (explicit)
@@ -163,6 +165,16 @@ Examples:
 EOF
             exit 0
             ;;
+        pull)
+            source "$ILMA_DIR/commands/remote.sh"
+            remote_usage
+            exit 0
+            ;;
+        remote)
+            source "$ILMA_DIR/commands/remote.sh"
+            remote_usage
+            exit 0
+            ;;
     esac
 fi
 
@@ -195,7 +207,7 @@ CURRENT_POSITION=0
 for arg in "$@"; do
     CURRENT_POSITION=$((CURRENT_POSITION + 1))
     case "$arg" in
-        backup|console|scan|prune|config|decrypt|extract|validate)
+        backup|console|scan|prune|config|decrypt|extract|validate|remote|pull)
             COMMAND="$arg"
             COMMAND_POSITION=$CURRENT_POSITION
             break
@@ -240,7 +252,7 @@ expand_combined_flags() {
 
 # Second pass - parse remaining arguments
 # Skip parsing entirely if command is validate (let validate.sh handle its own args)
-if [[ "$COMMAND" == "validate" ]]; then
+if [[ "$COMMAND" == "validate" || "$COMMAND" == "remote" || "$COMMAND" == "pull" ]]; then
     # Skip all arguments - validate.sh will handle them
     while (( $# > 0 )); do
         shift
@@ -840,6 +852,14 @@ case "$COMMAND" in
             source "$ILMA_DIR/commands/console.sh"
             show_backup_stats "$PROJECT_ROOT" "$MIRROR_DIR"
         fi
+        ;;
+    pull)
+        source "$ILMA_DIR/commands/remote.sh"
+        pull_alias_main "${ORIGINAL_ARGS[@]}"
+        ;;
+    remote)
+        source "$ILMA_DIR/commands/remote.sh"
+        remote_main "${ORIGINAL_ARGS[@]}"
         ;;
     config)
         show_config "$PROJECT_ROOT"

@@ -27,7 +27,7 @@ OUTPUT:
 
 Examples:
   $0 .ilma.conf                  # Process a specific config file
-  $0 *-project.ilma.conf         # Process multiple config files
+  $0 *.ilma.conf                 # Process multiple config files
   $0 /path/to/my-project         # Process inferred .ilma.conf from my-project/
 
 EOF
