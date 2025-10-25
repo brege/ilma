@@ -5,6 +5,9 @@ set -euo pipefail
 
 ILMA_DIR="$(dirname "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")")"
 
+REMOTE_JOB_PARSE_ERROR=""
+REMOTE_JOB_MANIFEST=()
+
 remote_usage() {
     cat <<'EOF'
 Usage: ilma remote pull <job-file> [OPTIONS]
@@ -35,25 +38,32 @@ JOB FILE FORMAT (INI-like):
   id=server-user
   remote=user@server
   remote_root=~
-  manifest=backup/user
   stage_dir=/var/tmp/ilma/stage/server-user
   target_dir=/backups/server/user
   mode=backup,archive
   verify=true
   cleanup_stage=false
+  basename=server-user
 
-  # Optional: where manifests live if not under remote_root
-  manifest_root=~/backup
+  [manifest]
+  # rsync filter syntax copied locally so manifests survive remote loss
+  + .ssh/
+  + .ssh/**
+  + .config/
+  + .config/**
+  - .cache/
+  - .cache/**
 
-Only the remote, manifest, and stage_dir keys are required. Defaults:
+Only the remote and stage_dir keys are required. Defaults:
   remote_root=~
-  manifest_root=<remote_root>
   mode=backup
   verify=false
   cleanup_stage=false
 
-The manifest should use rsync filter syntax ("+"/"-" rules). It is fetched
-fresh on each run and merged into the rsync invocation from remote_root.
+The manifest block is required and uses rsync filter syntax ("+"/"-" rules).
+It is stored locally (e.g. nodes/server/user.ini) and fed directly to rsync.
+During development we keep them in the repo under nodes/, but production layouts
+should prefer ~/.config/ilma/nodes/<node>.ini so manifests survive remote loss.
 EOF
 }
 
@@ -138,65 +148,60 @@ normalize_manifest_for_rsync() {
     done < "$input"
 }
 
-join_remote_path() {
-    local base="$1"
-    local path="$2"
-
-    if [[ -z "$path" ]]; then
-        printf '%s' "$base"
-        return
-    fi
-
-    if [[ "$path" == /* || "$path" == "~"* ]]; then
-        printf '%s' "$path"
-        return
-    fi
-
-    if [[ -z "$base" || "$base" == "." ]]; then
-        printf '%s' "$path"
-        return
-    fi
-
-    if [[ "$base" == */ ]]; then
-        printf '%s%s' "$base" "$path"
-    else
-        printf '%s/%s' "$base" "$path"
-    fi
-}
-
 reset_job_state() {
     REMOTE_JOB_ID=""
     REMOTE_JOB_REMOTE=""
     REMOTE_JOB_REMOTE_ROOT="~"
-    REMOTE_JOB_MANIFEST=""
-    REMOTE_JOB_MANIFEST_ROOT=""
     REMOTE_JOB_STAGE_DIR=""
     REMOTE_JOB_TARGET_DIR=""
     REMOTE_JOB_MODE="backup"
     REMOTE_JOB_VERIFY="false"
     REMOTE_JOB_CLEANUP_STAGE="false"
     REMOTE_JOB_BASENAME=""
+    REMOTE_JOB_MANIFEST=()
 }
 
-parse_remote_job() {
+try_parse_remote_job() {
     local job_file="$1"
-    [[ -f "$job_file" ]] || die "Job file not found: $job_file"
+    REMOTE_JOB_PARSE_ERROR=""
+    if [[ ! -f "$job_file" ]]; then
+        REMOTE_JOB_PARSE_ERROR="Job file not found: $job_file"
+        return 1
+    fi
 
     reset_job_state
     local section=""
+    local in_manifest="false"
+    local raw_line
 
     while IFS= read -r raw_line || [[ -n "$raw_line" ]]; do
-        local line
-        line="${raw_line%%#*}"
-        line="$(trim "$line")"
-        [[ -z "$line" ]] && continue
+        raw_line="${raw_line%$'\r'}"
+        local check_line
+        check_line="${raw_line%%#*}"
+        check_line="$(trim "$check_line")"
 
-        if [[ "$line" =~ ^\[(.+)\]$ ]]; then
+        if [[ "$check_line" =~ ^\[(.+)\]$ ]]; then
             section="${BASH_REMATCH[1]}"
+            local section_lower
+            section_lower="$(to_lower "$section")"
+            if [[ "$section_lower" == "manifest" || "$section_lower" == "manifest:"* ]]; then
+                in_manifest=true
+            else
+                in_manifest=false
+            fi
             continue
         fi
 
-        if [[ "$line" =~ ^([^=]+)=(.*)$ ]]; then
+        if [[ "$in_manifest" == "true" ]]; then
+            REMOTE_JOB_MANIFEST+=("$raw_line")
+            continue
+        fi
+
+        if [[ -z "$check_line" ]]; then
+            continue
+        fi
+
+        if [[ "$check_line" =~ ^([^=]+)=(.*)$ ]]; then
             local key
             key="$(trim "${BASH_REMATCH[1]}")"
             local value
@@ -209,8 +214,6 @@ parse_remote_job() {
                     id) REMOTE_JOB_ID="$value" ;;
                     remote) REMOTE_JOB_REMOTE="$value" ;;
                     remote_root) REMOTE_JOB_REMOTE_ROOT="$value" ;;
-                    manifest_root) REMOTE_JOB_MANIFEST_ROOT="$value" ;;
-                    manifest) REMOTE_JOB_MANIFEST="$value" ;;
                     stage_dir) REMOTE_JOB_STAGE_DIR="$value" ;;
                     target_dir) REMOTE_JOB_TARGET_DIR="$value" ;;
                     mode) REMOTE_JOB_MODE="$(to_lower "$value")" ;;
@@ -222,12 +225,19 @@ parse_remote_job() {
         fi
     done < "$job_file"
 
-    [[ -n "$REMOTE_JOB_REMOTE" ]] || die "Job file missing 'remote' value"
-    [[ -n "$REMOTE_JOB_MANIFEST" ]] || die "Job file missing 'manifest' value"
-    [[ -n "$REMOTE_JOB_STAGE_DIR" ]] || die "Job file missing 'stage_dir' value"
+    if [[ -z "$REMOTE_JOB_REMOTE" ]]; then
+        REMOTE_JOB_PARSE_ERROR="Job file missing 'remote' value"
+        return 1
+    fi
 
-    if [[ -z "$REMOTE_JOB_MANIFEST_ROOT" ]]; then
-        REMOTE_JOB_MANIFEST_ROOT="~"
+    if [[ -z "$REMOTE_JOB_STAGE_DIR" ]]; then
+        REMOTE_JOB_PARSE_ERROR="Job file missing 'stage_dir' value"
+        return 1
+    fi
+
+    if [[ ${#REMOTE_JOB_MANIFEST[@]} -eq 0 ]]; then
+        REMOTE_JOB_PARSE_ERROR="Job file missing [manifest] section"
+        return 1
     fi
 
     if [[ -z "$REMOTE_JOB_MODE" ]]; then
@@ -240,6 +250,18 @@ parse_remote_job() {
 
     if [[ -z "$REMOTE_JOB_CLEANUP_STAGE" ]]; then
         REMOTE_JOB_CLEANUP_STAGE="false"
+    fi
+
+    if [[ -z "$REMOTE_JOB_REMOTE_ROOT" ]]; then
+        REMOTE_JOB_REMOTE_ROOT="~"
+    fi
+
+    return 0
+}
+
+parse_remote_job() {
+    if ! try_parse_remote_job "$1"; then
+        die "$REMOTE_JOB_PARSE_ERROR"
     fi
 }
 
@@ -382,20 +404,11 @@ remote_pull() {
     normalized_manifest="$(mktemp)"
     trap '[[ -n "$manifest_temp" ]] && rm -f "$manifest_temp"; [[ -n "$normalized_manifest" ]] && rm -f "$normalized_manifest"' EXIT
 
-    local manifest_base
-    manifest_base="$REMOTE_JOB_MANIFEST_ROOT"
-    local manifest_remote_path
-    manifest_remote_path="$(join_remote_path "$manifest_base" "$REMOTE_JOB_MANIFEST")"
-
-    echo "Fetching manifest from ${REMOTE_JOB_REMOTE}:${manifest_remote_path}"
-    if ! ssh "$REMOTE_JOB_REMOTE" bash -s -- "$manifest_remote_path" >"$manifest_temp" <<'REMOTE_MANIFEST'
-set -euo pipefail
-manifest_path="$1"
-cat -- "$manifest_path"
-REMOTE_MANIFEST
-    then
-        die "Failed to retrieve manifest from remote host"
+    if [[ ${#REMOTE_JOB_MANIFEST[@]} -eq 0 ]]; then
+        die "Manifest section is empty for job file: $job_file"
     fi
+
+    printf '%s\n' "${REMOTE_JOB_MANIFEST[@]}" >"$manifest_temp"
 
     normalize_manifest_for_rsync "$manifest_temp" "$normalized_manifest"
 
@@ -444,7 +457,8 @@ REMOTE_MANIFEST
     meta_file="$metadata_dir/job.meta"
     {
         echo "remote=${REMOTE_JOB_REMOTE}"
-        echo "manifest=${manifest_remote_path}"
+        echo "job_file=$job_file"
+        echo "manifest_lines=${#REMOTE_JOB_MANIFEST[@]}"
         echo "fetched_at=$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
         echo "staged_dir=$stage_dir"
         echo "mode=${resolved_modes[*]}"
