@@ -3,8 +3,9 @@
 
 # Source shared utility functions
 source "$ILMA_DIR/lib/functions.sh"
+source "$ILMA_DIR/lib/configs.sh"
 
-# Unified path resolution for *_base_dir settings
+# Path resolution for *_base_dir settings
 resolve_base_dir() {
     local base_dir="$1"
     local project_root="$2"
@@ -70,23 +71,38 @@ create_context_only() {
         echo "No project type specified, loading combined exclusions from all project configs"
         # Always exclude .git directory in context mirrors (version control metadata not needed for LLMs)
         rsync_args+=("--exclude=.git/")
-        # Load and combine exclusions from all project config files
-        for config_file in "$ILMA_DIR"/configs/projects/*.ilma.conf; do
-            if [[ -f "$config_file" ]]; then
-                # Source the config in a subshell to extract RSYNC_EXCLUDES
-                local temp_excludes=()
-                while IFS= read -r line; do
-                    if [[ "$line" =~ ^[[:space:]]*--exclude ]]; then
-                        temp_excludes+=("$line")
-                    fi
-                done < <(grep -E "^\s*--exclude" "$config_file" || true)
+        # Load and combine exclusions from all project config files (user overrides take precedence)
+        declare -A type_config_map=()
+        local config_file type_name
 
-                # Add to rsync args
-                for exclude_arg in "${temp_excludes[@]}"; do
-                    exclude_pattern=$(echo "$exclude_arg" | sed "s/^[[:space:]]*--exclude[[:space:]]*['\"]*//" | sed "s/['\"][[:space:]]*$//" | sed "s/^[[:space:]]*//" | sed "s/[[:space:]]*$//")
-                    [[ -n "$exclude_pattern" ]] && rsync_args+=("--exclude=$exclude_pattern")
-                done
-            fi
+        if builtin_dir="$(get_ilma_builtin_projects_dir)"; then
+            while IFS= read -r -d '' config_file; do
+                type_name="$(basename "$config_file")"
+                type_name="${type_name%.ilma.conf}"
+                type_config_map["$type_name"]="$config_file"
+            done < <(find "$builtin_dir" -maxdepth 1 -type f -name '*.ilma.conf' -print0 | sort -z)
+        fi
+
+        if user_dir="$(get_ilma_user_projects_dir)"; then
+            while IFS= read -r -d '' config_file; do
+                type_name="$(basename "$config_file")"
+                type_name="${type_name%.ilma.conf}"
+                type_config_map["$type_name"]="$config_file"
+            done < <(find "$user_dir" -maxdepth 1 -type f -name '*.ilma.conf' -print0 | sort -z)
+        fi
+
+        for config_file in "${type_config_map[@]}"; do
+            local temp_excludes=()
+            while IFS= read -r line; do
+                if [[ "$line" =~ ^[[:space:]]*--exclude ]]; then
+                    temp_excludes+=("$line")
+                fi
+            done < <(grep -E "^\s*--exclude" "$config_file" || true)
+
+            for exclude_arg in "${temp_excludes[@]}"; do
+                exclude_pattern=$(echo "$exclude_arg" | sed "s/^[[:space:]]*--exclude[[:space:]]*['\"]*//" | sed "s/['\"][[:space:]]*$//" | sed "s/^[[:space:]]*//" | sed "s/[[:space:]]*$//")
+                [[ -n "$exclude_pattern" ]] && rsync_args+=("--exclude=$exclude_pattern")
+            done
         done
     fi
 

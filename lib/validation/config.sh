@@ -20,7 +20,7 @@ if [[ -f "$PROJECT_ROOT/.ilma.conf" ]]; then
 fi
 
 if [[ "$config_found" == false ]]; then
-    echo "INFO:No project config (.ilma.conf) - using global defaults"
+    echo "INFO:No per-project config (.ilma.conf) detected - using default"
 fi
 
 # Load project config to check PROJECT_TYPE
@@ -32,9 +32,9 @@ fi
 if [[ -n "${PROJECT_TYPE:-}" ]]; then
     SCRIPT_DIR="$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")"
     ILMA_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
+    source "$ILMA_DIR/lib/configs.sh"
 
-    type_config="$ILMA_DIR/configs/projects/${PROJECT_TYPE}.ilma.conf"
-    if [[ -f "$type_config" ]]; then
+    if type_config="$(resolve_ilma_type_config "$PROJECT_TYPE")"; then
         echo "PASS:PROJECT_TYPE inheritance ($PROJECT_TYPE)"
     else
         echo "FAIL:PROJECT_TYPE inheritance:Type config for '$PROJECT_TYPE' not found"

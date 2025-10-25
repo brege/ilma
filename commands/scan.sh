@@ -11,18 +11,28 @@ BLUE='\033[0;34m'
 RESET='\033[0m'
 
 ILMA_DIR="$(dirname "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")")"
-CONF_DIR="$ILMA_DIR/configs"
-
-# Find all .ilma.conf files
-mapfile -t config_files < <(find "$CONF_DIR" -maxdepth 1 -type f -name '*.ilma.conf' | sort)
+source "$ILMA_DIR/lib/configs.sh"
 
 declare -A types_map=()
-for cf in "${config_files[@]}"; do
-    basefile="$(basename "$cf")"
-    name="${basefile%.ilma.conf}"
-    short_name="$name"
-    types_map["$short_name"]="$cf"
-done
+
+add_types_from_dir() {
+    local dir="$1"
+    [[ -d "$dir" ]] || return
+    while IFS= read -r -d '' cf; do
+        local basefile
+        basefile="$(basename "$cf")"
+        local name="${basefile%.ilma.conf}"
+        types_map["$name"]="$cf"
+    done < <(find "$dir" -maxdepth 1 -type f -name '*.ilma.conf' -print0 | sort -z)
+}
+
+# Base configs first, user overrides later
+if builtin_dir="$(get_ilma_builtin_projects_dir)"; then
+    add_types_from_dir "$builtin_dir"
+fi
+if user_dir="$(get_ilma_user_projects_dir)"; then
+    add_types_from_dir "$user_dir"
+fi
 
 DEFAULT_TYPE=""
 TYPE="$DEFAULT_TYPE"
@@ -236,4 +246,3 @@ done
 if [[ "$PRETTY_OUTPUT" == "true" ]]; then
     echo -e "${YELLOW}Dry run complete: no files deleted${RESET}"
 fi
-

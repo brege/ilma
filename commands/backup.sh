@@ -8,7 +8,7 @@ source "$ILMA_DIR/lib/deps/compression.sh"
 source "$ILMA_DIR/lib/deps/rsync.sh"
 source "$ILMA_DIR/lib/deps/gpg.sh"
 
-# Unified path resolution for *_base_dir settings
+# Path resolution for *_base_dir settings
 resolve_base_dir() {
     local base_dir="$1"
     local project_root="$2"

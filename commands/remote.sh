@@ -4,12 +4,48 @@
 set -euo pipefail
 
 ILMA_DIR="$(dirname "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")")"
+source "$ILMA_DIR/lib/configs.sh"
 
 REMOTE_JOB_PARSE_ERROR=""
 REMOTE_JOB_MANIFEST=()
 
+resolve_job_spec_path() {
+    local spec="$1"
+    local expanded="${spec/#\~/$HOME}"
+
+    if [[ -f "$expanded" ]]; then
+        readlink -f "$expanded"
+        return 0
+    fi
+
+    local -a candidate_names=("$spec")
+    if [[ "$spec" != *.ini ]]; then
+        candidate_names+=("${spec}.ini")
+    fi
+
+    mapfile -t node_dirs < <(get_ilma_nodes_dirs)
+    local dir name candidate
+    for dir in "${node_dirs[@]}"; do
+        for name in "${candidate_names[@]}"; do
+            candidate="$dir/$name"
+            if [[ -f "$candidate" ]]; then
+                readlink -f "$candidate"
+                return 0
+            fi
+        done
+    done
+
+    return 1
+}
+
 remote_usage() {
     cat <<'EOF'
+Usage: ilma remote <subcommand> [OPTIONS]
+
+SUBCOMMANDS:
+  pull                Run remote pull jobs (stage + backup)
+  list                Show discovered node manifests (relative → absolute paths)
+
 Usage: ilma remote pull <job-file> [OPTIONS]
 
 Run a remote pull job: stage files from a remote host using an rsync manifest,
@@ -606,15 +642,10 @@ pull_alias_main() {
         die "No job files specified. Use --job <file> or provide a job path."
     fi
 
-    local job_spec
+    local job_spec job_path
     for job_spec in "${job_specs[@]}"; do
-        local job_path="$job_spec"
-        job_path="${job_path/#\~/$HOME}"
-        if [[ ! -f "$job_path" ]]; then
-            die "Job file not found: $job_spec"
-        fi
-        if ! job_path="$(readlink -f "$job_path")"; then
-            die "Unable to resolve job file path: $job_spec"
+        if ! job_path="$(resolve_job_spec_path "$job_spec")"; then
+            die "Job file not found: $job_spec (searched local path, $(get_ilma_config_home)/nodes, and $ILMA_DIR/nodes)"
         fi
         echo "Running job: $job_path"
         remote_pull "$job_path" "${passthrough[@]}"
@@ -643,6 +674,9 @@ remote_main() {
         pull)
             pull_alias_main remote pull "$@"
             ;;
+        list)
+            list_remote_jobs
+            ;;
         -h|--help|help)
             remote_usage
             ;;
@@ -650,4 +684,32 @@ remote_main() {
             die "Unknown remote subcommand '$subcommand'"
             ;;
     esac
+}
+
+list_remote_jobs() {
+    mapfile -t node_dirs < <(get_ilma_nodes_dirs)
+    if [[ ${#node_dirs[@]} -eq 0 ]]; then
+        echo "No node directories found. Create manifests under $(get_ilma_config_home)/nodes/."
+        exit 0
+    fi
+
+    printf "%-24s %s\n" "Manifest" "Resolved Path"
+    printf "%-24s %s\n" "--------" "-------------"
+
+    declare -A seen=()
+    local dir file rel abs
+
+    for dir in "${node_dirs[@]}"; do
+        while IFS= read -r -d '' file; do
+            abs="$(readlink -f "$file")"
+            [[ -n "${seen["$abs"]:-}" ]] && continue
+            rel="${file#"$dir"/}"
+            if [[ -z "$rel" || "$rel" == "$file" ]]; then
+                rel="$(basename "$file")"
+            fi
+            rel="${rel#/}"
+            printf "%-24s %s\n" "$rel" "$abs"
+            seen["$abs"]=1
+        done < <(find "$dir" -type f -name '*.ini' -print0 | sort -z)
+    done
 }
