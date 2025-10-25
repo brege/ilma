@@ -5,7 +5,6 @@ set -euo pipefail
 
 SCRIPT_DIR="$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")"
 ILMA_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
-DEFAULT_NODE_DIR="$ILMA_DIR/nodes"
 
 source "$ILMA_DIR/commands/remote.sh"
 
@@ -17,15 +16,16 @@ collect_targets() {
     local -n _collector=$1
     shift
 
-    if [[ $# -eq 0 ]]; then
-        if [[ -d "$DEFAULT_NODE_DIR" ]]; then
-            _collector+=("$DEFAULT_NODE_DIR")
-        else
-            return 0
-        fi
-    else
+    if [[ $# -gt 0 ]]; then
         _collector+=("$@")
+        return 0
     fi
+
+    mapfile -t node_dirs < <(get_ilma_nodes_dirs)
+    if [[ ${#node_dirs[@]} -gt 0 ]]; then
+        _collector+=("${node_dirs[@]}")
+    fi
+    return 0
 }
 
 enumerate_files() {
@@ -63,8 +63,6 @@ validate_manifest_file() {
     local remote="${REMOTE_JOB_REMOTE}"
     local line_count="${#REMOTE_JOB_MANIFEST[@]}"
     echo "PASS:${file}:remote=${remote} mode=${mode_summary} lines=${line_count}"
-    echo "INFO:Normalized manifest:${file}"
-    sed 's/^/  /' "$normalized"
     rm -f "$manifest_temp" "$normalized"
 }
 
@@ -74,7 +72,7 @@ main() {
     collect_targets supplied_paths "$@"
 
     if [[ ${#supplied_paths[@]} -eq 0 ]]; then
-        echo "INFO:No node manifests directory found (looked for $DEFAULT_NODE_DIR)"
+        echo "INFO:No node manifests directory found (checked $(get_ilma_config_home)/nodes and $ILMA_DIR/nodes)"
         return 0
     fi
 

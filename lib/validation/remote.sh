@@ -6,10 +6,12 @@ echo "SECTION:Remote Connectivity"
 # Load configuration from config.ini
 SCRIPT_DIR="$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")"
 ILMA_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
+source "$ILMA_DIR/lib/configs.sh"
 
-if [[ -f "$ILMA_DIR/config.ini" ]]; then
-    REMOTE_SERVER=$(grep -E '^\s*remote_server\s*=' "$ILMA_DIR/config.ini" 2>/dev/null | cut -d'=' -f2 | tr -d ' ' || echo "")
-    REMOTE_PATH=$(grep -E '^\s*remote_path\s*=' "$ILMA_DIR/config.ini" 2>/dev/null | cut -d'=' -f2 | tr -d ' ' || echo "")
+global_config_path=""
+if global_config_path="$(get_ilma_global_config_path)"; then
+    REMOTE_SERVER=$(grep -E '^\s*remote_server\s*=' "$global_config_path" 2>/dev/null | cut -d'=' -f2 | tr -d ' ' || echo "")
+    REMOTE_PATH=$(grep -E '^\s*remote_path\s*=' "$global_config_path" 2>/dev/null | cut -d'=' -f2 | tr -d ' ' || echo "")
 fi
 
 # Override with project config if it exists

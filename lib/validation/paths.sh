@@ -8,12 +8,14 @@ echo "SECTION:Local Paths & Permissions"
 # Load configuration from config.ini and project config
 SCRIPT_DIR="$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")"
 ILMA_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
+source "$ILMA_DIR/lib/configs.sh"
 
 # Load from config.ini
-if [[ -f "$ILMA_DIR/config.ini" ]]; then
-    BACKUP_BASE_DIR=$(grep -E '^\s*backup_base_dir\s*=' "$ILMA_DIR/config.ini" 2>/dev/null | cut -d'=' -f2 | tr -d ' ' || echo "")
-    ARCHIVE_BASE_DIR=$(grep -E '^\s*archive_base_dir\s*=' "$ILMA_DIR/config.ini" 2>/dev/null | cut -d'=' -f2 | tr -d ' ' || echo "")
-    CONTEXT_BASE_DIR=$(grep -E '^\s*context_base_dir\s*=' "$ILMA_DIR/config.ini" 2>/dev/null | cut -d'=' -f2 | tr -d ' ' || echo "")
+config_path=""
+if config_path="$(get_ilma_global_config_path)"; then
+    BACKUP_BASE_DIR=$(grep -E '^\s*backup_base_dir\s*=' "$config_path" 2>/dev/null | cut -d'=' -f2 | tr -d ' ' || echo "")
+    ARCHIVE_BASE_DIR=$(grep -E '^\s*archive_base_dir\s*=' "$config_path" 2>/dev/null | cut -d'=' -f2 | tr -d ' ' || echo "")
+    CONTEXT_BASE_DIR=$(grep -E '^\s*context_base_dir\s*=' "$config_path" 2>/dev/null | cut -d'=' -f2 | tr -d ' ' || echo "")
 fi
 
 # Load from project config (overrides)

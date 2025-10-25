@@ -90,7 +90,7 @@ source ~/.bashrc
 ```
 
 > #### Compression Algorithm Note
-> The default compression library used in this project is [Zstandard (`zstd`)](https://github.com/facebook/zstd). This is a personal choice, which I use because of good performance on Btrfs filesystems. While `zstd` is not yet as widely supported across all platforms as `gzip`, `bzip2`, or `xz` (in that order), it is available on most modern Linux systems.
+> The default compression library used in this project is [Zstandard (`zstd`)](https://github.com/facebook/zstd). This is a personal choice, which I use because of good performance on Btrfs filesystems.  Zstandard is also [the algorithm restic uses](https://restic.readthedocs.io/en/latest/100_references.html). While `zstd` is not yet as widely supported across all platforms as `gzip`, `bzip2`, or `xz` (in that order), it is available on most modern Linux systems.
 >
 > [ [compression][1] ][ [speed][2] ][ [usage][3] ]
 

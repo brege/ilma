@@ -1,6 +1,9 @@
 #!/bin/bash
 # commands/config.sh - Configuration loading and management for ilma
 
+ILMA_DIR="$(dirname "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")")"
+source "$ILMA_DIR/lib/configs.sh"
+
 # Load INI configuration file
 load_ini_config() {
     local ini_file="$1"
@@ -79,18 +82,18 @@ load_config() {
     VERIFY_DEFAULT=false
 
     # Load central config.ini first
-    ILMA_DIR="$(dirname "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")")"
     CONFIG_FOUND=false
-    if [[ -f "$ILMA_DIR/config.ini" ]]; then
-        load_ini_config "$ILMA_DIR/config.ini"
+    local global_config_path=""
+    if global_config_path="$(get_ilma_global_config_path)"; then
+        load_ini_config "$global_config_path"
         CONFIG_FOUND=true
     fi
 
     # Load type-specific config if specified (for archive creation only)
     TYPE_CONFIG_LOADED=false
     if [[ -n "$type" ]]; then
-        local type_config="$ILMA_DIR/configs/projects/${type}.ilma.conf"
-        if [[ -f "$type_config" ]]; then
+        local type_config=""
+        if type_config="$(resolve_ilma_type_config "$type")"; then
             source "$type_config"
             TYPE_CONFIG_LOADED=true
         else
@@ -106,11 +109,11 @@ load_config() {
 
         # If PROJECT_TYPE is set, load that type config first
         if [[ -n "$PROJECT_TYPE" ]]; then
-            local type_config="$ILMA_DIR/configs/projects/${PROJECT_TYPE}.ilma.conf"
-            if [[ -f "$type_config" ]]; then
+            local type_config=""
+            if type_config="$(resolve_ilma_type_config "$PROJECT_TYPE")"; then
                 source "$type_config"
             else
-                echo "Warning: PROJECT_TYPE '$PROJECT_TYPE' not found in configs/" >&2
+                echo "Warning: PROJECT_TYPE '$PROJECT_TYPE' not found in configured project directories" >&2
             fi
 
             # Second pass: re-source local config for overrides/appends
@@ -190,7 +193,7 @@ EXAMPLES:
   ilma config ~/my-project        # Show config for specific project
 
 NOTES:
-  - Configuration hierarchy: CLI flags > ~/.config/oshea/config.yaml > defaults
+  - Configuration hierarchy: CLI flags > ~/.config/ilma/config.ini > defaults
   - Local .ilma.conf files override global settings
   - Use this to verify your configuration before running backups
 

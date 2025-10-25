@@ -10,8 +10,10 @@ if command -v gpg >/dev/null 2>&1; then
     if [[ -z "${GPG_KEY_ID:-}" ]]; then
         SCRIPT_DIR="$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")"
         ILMA_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
-        if [[ -f "$ILMA_DIR/config.ini" ]]; then
-            GPG_KEY_ID=$(grep -E '^\s*key_id\s*=' "$ILMA_DIR/config.ini" 2>/dev/null | cut -d'=' -f2 | tr -d ' ' || echo "")
+        source "$ILMA_DIR/lib/configs.sh"
+        config_path=""
+        if config_path="$(get_ilma_global_config_path)"; then
+            GPG_KEY_ID=$(grep -E '^\s*key_id\s*=' "$config_path" 2>/dev/null | cut -d'=' -f2 | tr -d ' ' || echo "")
         fi
     fi
 
