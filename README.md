@@ -1,20 +1,16 @@
 # ilma
 
-A comprehensive project backup and archival tool with intelligent project-type awareness, encryption, and remote synchronization capabilities.
+A project backup and archival tool with selective project-type awareness, pruning, encryption, and remote synchronization.
 
 ## Features
 
 - **Project-Type Awareness**
 
-  Automatically detects and applies appropriate exclusions for Python, Node.js, LaTeX, Bash projects and can be extended to any project with build and run matter.
+  Automatic detection of and applies appropriate exclusions for Python, Node.js, LaTeX, Bash projects and can be extended to any project with build and run matter.
 
 - **Standard GPG, tar, and rsync core with ergonomic CLI**
 
-  Optional file encryption for secure backup storage, quick archival and backups, context trimming repos for LLM's, secure remote push for any target type
-
-- **Flexible and Granular Configuration**
-
-  Global settings with per-project overrides allowing intricate customization based on many directories.
+  GPG encryption for secure transport and storage. Create context mirrors of projects (working tree without git artifacts, node\_modules, build outputs) for LLM interaction or quick archival
 
 - **Prune per-project build artifacts on archival**
 
@@ -24,7 +20,7 @@ A comprehensive project backup and archival tool with intelligent project-type a
 
 **Immediate Backup**
 
-By default, **ilma** will backup the current directory and store a copy as a sibling directory.
+By default, **ilma** will backup the current directory and store a copy as a sibling.
 
 ```bash
 ilma
@@ -39,7 +35,7 @@ based on project type or project-local configuration files.
 ilma prune ~/dissertation \
     --type latex \         # remove build artifacts .aux, .toc, etc
     --log \                # log to ~/dissertation.log
-    --bak                 # backup to ~/dissertation.bak
+    --bak                  # backup to ~/dissertation.bak
 ```
 
 **Send encrypted archive to remote server**
@@ -94,9 +90,8 @@ source ~/.bashrc
 ```
 
 > #### Compression Algorithm Note
-> This project uses [Zstandard (`zstd`)](https://github.com/facebook/zstd) as the default compression method. It offers excellent performance—especially on modern filesystems like Btrfs—and balances speed and compression efficiency better than traditional tools.
+> The default compression library used in this project is [Zstandard (`zstd`)](https://github.com/facebook/zstd). This is a personal choice, which I use because of good performance on Btrfs filesystems. While `zstd` is not yet as widely supported across all platforms as `gzip`, `bzip2`, or `xz` (in that order), it is available on most modern Linux systems.
 >
-> While `zstd` is not yet as widely supported across all platforms as `gzip`, `bzip2`, or `xz` (in that order), it is available on most modern Linux systems. This early-stage choice reflects a focus on performance and simplicity for power users, but any of the listed tools will work just as well.
 > [ [compression][1] ][ [speed][2] ][ [usage][3] ]
 
 [1]: https://rsmith.home.xs4all.nl/miscellaneous/evaluating-zstandard-compression.html?utm_source=chatgpt.com
@@ -143,8 +138,7 @@ ilma -e --verify --remote srv:/dst  # Encrypt, upload, and verify remote hash
 
 ### Analysis & Statistics
 
-This command is hand if you share your project with LLM's. 
-It provides a quick overview of file and estimated token counts.
+Create context mirrors for LLM interaction by excluding git history, build artifacts, and dependency directories. Snapshots current working state including uncommitted and untracked files without git ceremony.
 
 ```bash
 ilma console [PROJECT_PATH]      # Show detailed project statistics
@@ -159,8 +153,8 @@ quickly without trial-and-error on your data.
 
 ```bash
 ilma validate                    # Basic configuration validation
-ilma validate full               # Includes remote connectivity tests
-ilma validate smoke-test         # End-to-end test with dummy project
+ilma validate --full             # Includes remote + dependency checks
+ilma validate --remote           # Remote connectivity + manifest linting
 ```
 
 ### Configuration
@@ -173,74 +167,64 @@ ilma config [PROJECT_PATH]       # Show resolved configuration
 
 ### Archive Management
 
-With GPG, you can encrypt your backups for secure storage,
-especially useful on remote servers.
+GPG encryption for secure transport to untrusted or exposed storage.
+Extract and decrypt commands auto-detect compression formats and use chunked processing for efficiency.
 
 ```bash
-ilma extract archive.tar.zst
-ilma decrypt file.tar.zst.gpg
+ilma extract archive.tar.zst     # Auto-detects compression format
+ilma decrypt file.tar.zst.gpg    # Decrypts and decompresses in one pass
 ```
 
-## Configuration File Examples
+---
 
-**Simple Project Backup**
+## What ilma is and is not
 
-There are two main ways to make use of language-specific presets.
+You use **ilma** to backup irreplaceable things like configs, databases, pictures, presentations, etc.
+You use **ilma** to quickly create archives from local and remote work, take them on the go securely, 
+and recover them when needed.
 
-In **`.ilma.conf`**
-```bash .ilma.conf
-PROJECT_TYPE="python"
-```
-which is equivalent to the `ilma --type python` command.
+**ilma** is **NOT** intended to be a deduplication or synchronization tool.
+These tools offer better coverage for those tasks:
 
-**Encrypted Remote Backup**
-```bash .ilma.conf
-PROJECT_TYPE="node"
-GPG_KEY_ID="your-gpg-key-id or email"
-REMOTE_SERVER="server.local"
-REMOTE_PATH="/storage/backups"
-COMPRESSION_TYPE="zstd" 
-COMPRESSION_LEVEL="3"
-```
+- Recommended encrypted, deduplicated backups: [**restic**](https://restic.net/)
+- Recommended synchronization tool: [**syncthing**](https://syncthing.net/)
 
-**Backup Naming Strategy**
-```bash .ilma.conf
-# Handle duplicate backup directories
-VERSIONING="timestamp"  # project-20250101-123456.bak (default)
-# VERSIONING="numbered" # project.1.bak, project.2.bak
-# VERSIONING="overwrite" # always overwrite project.bak
-```
+Because **ilma** is written as a shell wrapper for common file-handling tools,
+ilma-"generated" files are completely recoverable without needing ilma.
+Restic requires restic for recovery.
+Syncthing is synchronous, and opaque in the only place you get encryption: "untrusted device" mode.
 
-**Custom Exclusions**
-```bash .ilma.conf
-PROJECT_TYPE="python"
-RSYNC_EXCLUDES=() # Clear default excludes
-RSYNC_EXCLUDES+=(
-    --exclude '*.log'
-    --exclude 'tmp/'
-    --exclude 'paraview/*.vtk'
-)
-CONTEXT_FILES+=(
-    "AGENTS.md"
-)
+**ilma** works in addition to restic and syncthing for different purposes.
+Restic efficiently backs up entire home directories with deduplication and versioning.
+Syncthing maintains synchronized state across devices.
+ilma can be used to create encrypted project snapshots for transport to untrusted storage.
+
+Since ilma can push to multiple destinations, additional encrypted archives can be placed in syncthing folders or backed up by restic alongside other data.
+
+### Backing up remote configs, databases, etc
+
+Pull from remote machines (NAS, Raspberry Pi, servers) without running an SSH server on your local machine.
+Job manifests use rsync's filter syntax for selective transfer.
+
+```bash
+ilma remote pull --job admin@server.ini
 ```
 
-## Advanced Usage
-
-### Backup Hierarchy
-**ilma** creates a structured backup hierarchy:
+The `--job` file is a manifest that can be made as exclusive or inclusive as you want. It **is** better to be as exclusive as you can here. An example:
+```ini
+[job]
+id=admin@server.ini
+...
+[manifest]
++ .          # sync all non-hidden files in /home/admin
+- .*         # ignore all hidden files in /home/admin
+...
++ .config/** # but DO sync .config/
+...
++ .ssh/**    # and sync .ssh/
+...
 ```
-project.bak/                     # Main backup directory
-├── project-files/               # Complete project mirror
-├── project/                     # Context mirror (key files only) 
-└── project.tar.zst              # Compressed archive (if enabled)
-```
 
-### Configuration Inheritance
-**ilma** uses a hierarchical configuration system:
-1. **Global defaults** from `config.ini`, currently at **ilma's repo root**
-2. **Project type config** (e.g., `configs/projects/python.ilma.conf`)
-3. **Local overrides** from `.ilma.conf`
 
 ## License
 

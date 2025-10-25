@@ -129,6 +129,7 @@ case "$VALIDATION_MODE" in
         ;;
     remote)
         "$ILMA_DIR/lib/validation/remote.sh" "$PROJECT_ROOT" | format_output
+        "$ILMA_DIR/lib/validation/manifests.sh" | format_output
         ;;
     basic)
         echo -e "${BLUE}ilma Configuration Validator${RESET}"
@@ -150,6 +151,7 @@ case "$VALIDATION_MODE" in
         COMPRESSION_TYPE="${COMPRESSION_TYPE:-}" "$ILMA_DIR/lib/validation/compression.sh" | format_output
         GPG_KEY_ID="${GPG_KEY_ID:-}" "$ILMA_DIR/lib/validation/gpg.sh" | format_output
         "$ILMA_DIR/lib/validation/remote.sh" "$PROJECT_ROOT" | format_output
+        "$ILMA_DIR/lib/validation/manifests.sh" | format_output
         "$ILMA_DIR/lib/validation/dependencies.sh" | format_output
         ;;
     *)
