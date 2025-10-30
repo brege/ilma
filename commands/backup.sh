@@ -108,8 +108,10 @@ do_backup() {
             backup_basename="$(basename "$MAIN_BACKUP_DIR")"
             BACKUP_EXCLUDES+=(--exclude "$backup_basename/")
         fi
-
-        smart_copy "$project_root" "$MAIN_BACKUP_DIR" -av --delete "${BACKUP_EXCLUDES[@]}"
+        local -a backup_rsync_args=()
+        ilma_append_rsync_preserve_args backup_rsync_args
+        backup_rsync_args+=(--delete --delete-delay --info=progress2)
+        smart_copy "$project_root" "$MAIN_BACKUP_DIR" "${backup_rsync_args[@]}" "${BACKUP_EXCLUDES[@]}"
         echo "Main backup complete."
     }
 
@@ -127,12 +129,15 @@ do_backup() {
                 project_xdg_dir="$xdg_expanded/$project_name"
 
                 if [[ -d "$project_xdg_dir" ]]; then
+                    local -a xdg_rsync_args=()
+                    ilma_append_rsync_preserve_args xdg_rsync_args
+                    xdg_rsync_args+=(--info=progress2 --partial)
                     # Create relative path structure in backup
                     xdg_rel_path="${xdg_base#~/}"  # Remove ~/ prefix
                     backup_dest="$XDG_BACKUP_DIR/$xdg_rel_path"
                     mkdir -p "$backup_dest"
 
-                    smart_copy "$project_xdg_dir" "$backup_dest/$project_name" -av
+                    smart_copy "$project_xdg_dir" "$backup_dest/$project_name" "${xdg_rsync_args[@]}"
                     echo "  - Backed up $project_xdg_dir"
                 fi
             done
@@ -162,7 +167,10 @@ do_backup() {
         CONTEXT_EXCLUDES=("--exclude" ".git/")
         FINAL_EXCLUDES=("${RSYNC_EXCLUDES[@]}" "${DYNAMIC_EXCLUDES[@]}" "${CONTEXT_EXCLUDES[@]}")
 
-        smart_copy "$project_root" "$MIRROR_DIR" -av --delete "${FINAL_EXCLUDES[@]}"
+        local -a mirror_rsync_args=()
+        ilma_append_rsync_preserve_args mirror_rsync_args
+        mirror_rsync_args+=(--delete --delete-delay --info=progress2)
+        smart_copy "$project_root" "$MIRROR_DIR" "${mirror_rsync_args[@]}" "${FINAL_EXCLUDES[@]}"
         echo "Context mirror created."
         echo
 

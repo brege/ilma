@@ -44,13 +44,17 @@ sync_to_remote() {
     echo "Syncing encrypted archive to remote server $remote_server:$remote_path..."
 
     # Use optimal rsync flags based on content type
-    local rsync_opts="-avP"
+    local -a rsync_opts=()
+    ilma_append_rsync_preserve_args rsync_opts
+    rsync_opts+=(--partial --info=progress2)
+    local -a rsync_cmd=("rsync" "${rsync_opts[@]}")
+    local -a rsync_cmd_compress=("${rsync_cmd[@]}" "--compress")
     if is_compressed_archive "$(basename "$local_file")" || [[ "$local_file" =~ \.zst\.gpg$ ]]; then
         # Skip compression for already-compressed content
-        rsync $rsync_opts "$local_file" "${remote_server}:${remote_path}/"
+        "${rsync_cmd[@]}" "$local_file" "${remote_server}:${remote_path}/"
     else
         # Use compression for uncompressed archives
-        rsync ${rsync_opts}z "$local_file" "${remote_server}:${remote_path}/"
+        "${rsync_cmd_compress[@]}" "$local_file" "${remote_server}:${remote_path}/"
     fi
 
     if [[ $? -ne 0 ]]; then

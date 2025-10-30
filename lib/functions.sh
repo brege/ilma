@@ -127,6 +127,49 @@ git-count-files() {
   fi
 }
 
+# Cached rsync capability detection
+declare -g _ILMA_RSYNC_CAPS_CHECKED=0
+declare -Ag _ILMA_RSYNC_CAPABILITIES=()
+
+ilma_detect_rsync_capabilities() {
+    if (( _ILMA_RSYNC_CAPS_CHECKED )); then
+        return
+    fi
+
+    _ILMA_RSYNC_CAPS_CHECKED=1
+    local version_output
+    version_output=$(rsync --version 2>/dev/null || true)
+
+    if [[ -z "$version_output" ]]; then
+        return
+    fi
+
+    if grep -qiE '(^|\s)acl(s)?(\s|$)' <<<"$version_output"; then
+        _ILMA_RSYNC_CAPABILITIES[acl]=1
+    fi
+    if grep -qiE '(^|\s)xattr(s)?(\s|$)' <<<"$version_output"; then
+        _ILMA_RSYNC_CAPABILITIES[xattr]=1
+    fi
+}
+
+ilma_rsync_supports_capability() {
+    local capability="$1"
+    ilma_detect_rsync_capabilities
+    [[ "${_ILMA_RSYNC_CAPABILITIES[$capability]:-0}" -eq 1 ]]
+}
+
+ilma_append_rsync_preserve_args() {
+    local -n _dest=$1
+    ilma_detect_rsync_capabilities
+    _dest+=(--archive --human-readable)
+    if ilma_rsync_supports_capability "acl"; then
+        _dest+=(--acls)
+    fi
+    if ilma_rsync_supports_capability "xattr"; then
+        _dest+=(--xattrs)
+    fi
+}
+
 # Execute command with progress bar if pv is available and file is large enough
 execute_with_progress() {
     local estimated_size="$1"
@@ -219,6 +262,14 @@ smart_copy() {
         if [[ "$arg" =~ ^--(include|exclude|delete|archive|human-readable|itemize-changes) ]]; then
             has_rsync_specific=true
             break
+        elif [[ "$arg" =~ ^--(info|partial|acls|xattrs) ]]; then
+            has_rsync_specific=true
+            break
+        elif [[ "$arg" == -* && "$arg" != --* ]]; then
+            if [[ "$arg" == *a* || "$arg" == *A* || "$arg" == *X* || "$arg" == *h* ]]; then
+                has_rsync_specific=true
+                break
+            fi
         fi
     done
 

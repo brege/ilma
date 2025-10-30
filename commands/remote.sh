@@ -5,6 +5,7 @@ set -euo pipefail
 
 ILMA_DIR="$(dirname "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")")"
 source "$ILMA_DIR/lib/configs.sh"
+source "$ILMA_DIR/lib/functions.sh"
 
 REMOTE_JOB_PARSE_ERROR=""
 REMOTE_JOB_MANIFEST=()
@@ -461,7 +462,9 @@ remote_pull() {
 
     echo "Staging files into $stage_dir"
     local rsync_args
-    rsync_args=(rsync -av --delete "--filter=merge $normalized_manifest")
+    rsync_args=(rsync)
+    ilma_append_rsync_preserve_args rsync_args
+    rsync_args+=(--delete --delete-delay --partial --info=progress2 "--filter=merge $normalized_manifest")
 
     if [[ "$dry_run" == "true" ]]; then
         rsync_args+=(--dry-run)

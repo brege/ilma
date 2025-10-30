@@ -45,11 +45,9 @@ create_context_only() {
     mkdir -p "$output_path"
 
     # Build rsync command for context files only
-    local rsync_args=(
-        "--archive"
-        "--delete"
-        "--human-readable"
-    )
+    local rsync_args=()
+    ilma_append_rsync_preserve_args rsync_args
+    rsync_args+=(--delete --delete-delay --info=progress2)
 
     # Add context file patterns as includes (if any)
     if [[ ${#CONTEXT_FILES[@]} -gt 0 ]]; then
