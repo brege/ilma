@@ -20,12 +20,9 @@ sync_to_remote() {
     source "$ILMA_DIR/lib/deps/rsync.sh"
 
     # Build rsync command
-    local rsync_args=(
-        "--archive"
-        "--delete"
-        "--human-readable"
-        "--progress"
-    )
+    local rsync_args=()
+    ilma_append_rsync_preserve_args rsync_args
+    rsync_args+=(--delete --delete-delay --partial --info=progress2)
 
     # Add exclusions
     for exclude in "${RSYNC_EXCLUDES[@]}"; do
@@ -60,11 +57,9 @@ sync_archive_to_remote() {
 
     echo "Uploading archive to remote: $remote_target"
 
-    local rsync_args=(
-        "--archive"
-        "--human-readable"
-        "--progress"
-    )
+    local rsync_args=()
+    ilma_append_rsync_preserve_args rsync_args
+    rsync_args+=(--partial --info=progress2)
 
     rsync_args+=("$archive_file")
     rsync_args+=("$remote_target/")

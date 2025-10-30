@@ -120,7 +120,13 @@ verify_mirror_integrity() {
         return 1
     fi
 
-    local args=("-rcn" "--delete" "-l")
+    local -a args=("--recursive" "--checksum" "--dry-run" "--delete" "--links" "--info=progress2")
+    if ilma_rsync_supports_capability "acl"; then
+        args+=("--acls")
+    fi
+    if ilma_rsync_supports_capability "xattr"; then
+        args+=("--xattrs")
+    fi
     for exclude in "${RSYNC_EXCLUDES[@]}"; do
         if [[ "$exclude" == --exclude* ]]; then
             args+=("$exclude")
