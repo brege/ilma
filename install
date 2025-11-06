@@ -1,0 +1,49 @@
+#!/bin/bash
+set -e
+
+[ -w /usr/local/lib ] || { echo "Can't write to /usr/local/lib"; exit 1; }
+[ -w /usr/local/bin ] || { echo "Can't write to /usr/local/bin"; exit 1; }
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+cd "$SCRIPT_DIR"
+
+# Ensure we're in a git repo
+if ! git rev-parse --git-dir > /dev/null 2>&1; then
+    echo "Error: Must run from a git repository" >&2
+    exit 1
+fi
+
+# Get all tracked files, excluding non-essential ones
+mapfile -t FILES < <(git ls-files | grep -v -E '^(\.|tools/|docs/|.*\.md$|LICENSE|config\.example\.ini)')
+
+# Create installation directory
+INSTALL_DIR="/usr/local/lib/ilma"
+mkdir -p "$INSTALL_DIR"
+
+# Copy files preserving directory structure
+for file in "${FILES[@]}"; do
+    target="$INSTALL_DIR/$file"
+    mkdir -p "$(dirname "$target")"
+    cp "$file" "$target"
+done
+
+# Ensure main executable is executable
+chmod +x "$INSTALL_DIR/ilma"
+
+# Create symlink
+ln -sf "$INSTALL_DIR/ilma" /usr/local/bin/ilma
+
+# Copy starter config to user config directory if it doesn't exist
+USER_CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/ilma"
+USER_CONFIG="$USER_CONFIG_DIR/config.ini"
+
+if [ ! -f "$USER_CONFIG" ]; then
+    mkdir -p "$USER_CONFIG_DIR"
+    cp "$SCRIPT_DIR/config.example.ini" "$USER_CONFIG"
+    echo "Created starter config at $USER_CONFIG"
+else
+    echo "Existing config found at $USER_CONFIG (not overwritten)"
+fi
+
+echo "Installed ilma to /usr/local/bin/ilma"
+echo "Files installed: ${#FILES[@]}"
