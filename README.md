@@ -18,6 +18,16 @@ A project backup and archival tool with selective project-type awareness, prunin
 
 ## Quick Start
 
+**Install**
+
+```bash
+git clone https://github.com/brege/ilma
+cd ilma
+./install
+
+ilma --help
+```
+
 **Immediate Backup**
 
 By default, **ilma** will backup the current directory and store a copy as a sibling.
