@@ -46,4 +46,6 @@ else
 fi
 
 echo "Installed ilma to /usr/local/bin/ilma"
-echo "Files installed: ${#FILES[@]}"
+echo "Run: ilma --help"
+echo "Project configs: /usr/local/lib/ilma/configs/"
+echo "Run: ilma validate --dependencies"
