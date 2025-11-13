@@ -21,10 +21,14 @@ INSTALL_DIR="/usr/local/lib/ilma"
 mkdir -p "$INSTALL_DIR"
 
 # Copy files preserving directory structure
+updated_files=()
 for file in "${FILES[@]}"; do
     target="$INSTALL_DIR/$file"
     mkdir -p "$(dirname "$target")"
-    cp "$file" "$target"
+    if [[ ! -f "$target" ]] || ! cmp -s "$file" "$target"; then
+        cp -a "$file" "$target"
+        updated_files+=("$file")
+    fi
 done
 
 # Ensure main executable is executable
@@ -39,12 +43,17 @@ USER_CONFIG="$USER_CONFIG_DIR/config.ini"
 
 if [ ! -f "$USER_CONFIG" ]; then
     mkdir -p "$USER_CONFIG_DIR"
-    cp "$SCRIPT_DIR/config.example.ini" "$USER_CONFIG"
+    cp -a "$SCRIPT_DIR/config.example.ini" "$USER_CONFIG"
     echo "Created starter config at $USER_CONFIG"
 else
     echo "Existing config found at $USER_CONFIG (not overwritten)"
 fi
 
+if [[ ${#updated_files[@]} -gt 0 ]]; then
+    echo "Updated ${#updated_files[@]} file(s)"
+else
+    echo "All files up to date"
+fi
 echo "Installed ilma to /usr/local/bin/ilma"
 echo "Run: ilma --help"
 echo "Project configs: /usr/local/lib/ilma/configs/"
