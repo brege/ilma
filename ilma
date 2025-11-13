@@ -199,6 +199,7 @@ NO_EXTRACT_FLAG=""
 FORCE_FLAG=""
 OUTDIR_FLAG=""
 VERIFY_FLAG=""
+TIMESTAMP_FLAG=""
 
 # First pass - scan all arguments to identify command and check position
 COMMAND="backup"  # Default command
@@ -401,6 +402,10 @@ else
             VERIFY_FLAG="true"
             shift
             ;;
+        --timestamp)
+            TIMESTAMP_FLAG="true"
+            shift
+            ;;
         --target)
             if [[ -z "${2:-}" ]]; then
                 echo "Error: --target requires a directory path" >&2
@@ -449,6 +454,29 @@ if [[ -z "$PROJECT_ROOT" ]]; then
     PROJECT_ROOT="$(pwd)"
 fi
 
+# Handle --timestamp flag before file/directory processing
+if [[ "$TIMESTAMP_FLAG" == "true" ]]; then
+    if [[ ! -f "$PROJECT_ROOT" ]]; then
+        echo "Error: --timestamp requires a file path" >&2
+        exit 1
+    fi
+    file="$PROJECT_ROOT"
+    if [[ "$file" =~ ^(.*)\.tar\.(.*)$ ]]; then
+        base="${BASH_REMATCH[1]}"
+        ext="tar.${BASH_REMATCH[2]}"
+    elif [[ "$file" =~ \.(tgz|tbz2|txz)$ ]]; then
+        base="${file%.*}"
+        ext="${file##*.}"
+    else
+        echo "Error: Not an archive file" >&2
+        exit 1
+    fi
+    ts="$(date -r "$file" +%Y%m%d-%H%M%S)"
+    new_file="${base}-${ts}.${ext}"
+    mv "$file" "$new_file" && echo "Renamed: $file -> $new_file"
+    exit 0
+fi
+
 # Initialize ADDITIONAL_PATHS if not already set
 if [[ -z "${ADDITIONAL_PATHS+x}" ]]; then
     ADDITIONAL_PATHS=()
@@ -474,6 +502,11 @@ PROJECT_NAME="$(basename "$PROJECT_ROOT")"
 source "$ILMA_DIR/commands/config.sh"
 source "$ILMA_DIR/lib/deps/compression.sh"
 load_config "$PROJECT_ROOT" "$TYPE"
+# Override archive naming if --timestamp flag is set
+if [[ "$TIMESTAMP_FLAG" == "true" ]]; then
+    ARCHIVE_VERSIONING="force_timestamp"
+    ENCRYPT_VERSIONING="force_timestamp"
+fi
 # Apply config-driven verify default if flag not provided
 if [[ -z "$VERIFY_FLAG" ]]; then
     if [[ "${VERIFY:-}" == "true" || "${VERIFY_DEFAULT:-false}" == "true" ]]; then
