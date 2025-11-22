@@ -104,21 +104,6 @@ create_archive_only() {
     # Source compression utilities
     source "$ILMA_DIR/lib/deps/compression.sh"
 
-    # Build tar command with exclusions
-    local tar_args=("--create")
-    local compression_option
-    compression_option=$(get_tar_option "$COMPRESSION_TYPE")
-    [[ -n "$compression_option" ]] && tar_args+=("$compression_option")
-
-    # Add exclusions
-    for exclude in "${RSYNC_EXCLUDES[@]}"; do
-        if [[ "$exclude" == --exclude* ]]; then
-            tar_args+=("$exclude")
-        fi
-    done
-
-    tar_args+=("--file=$output_path")
-
     # For single directory origins, avoid unnecessary nesting by archiving contents directly
     # Check if this is a single directory target (not a working directory with .git, etc.)
     local is_single_target=false
@@ -126,6 +111,10 @@ create_archive_only() {
         # Appears to be a simple directory target rather than a project directory
         is_single_target=true
     fi
+
+    # Build tar command with exclusions
+    local tar_args
+    mapfile -t tar_args < <(build_tar_args "$COMPRESSION_TYPE" "$output_path" "${RSYNC_EXCLUDES[@]}" | tr '\0' '\n')
 
     if [[ "$is_single_target" == "true" ]]; then
         # Single directory case: archive contents directly to avoid nesting
@@ -191,19 +180,8 @@ create_multi_origin_archive() {
     source "$ILMA_DIR/lib/deps/compression.sh"
 
     # Build tar command with exclusions
-    local tar_args=("--create")
-    local compression_option
-    compression_option=$(get_tar_option "$COMPRESSION_TYPE")
-    [[ -n "$compression_option" ]] && tar_args+=("$compression_option")
-
-    # Add exclusions
-    for exclude in "${RSYNC_EXCLUDES[@]}"; do
-        if [[ "$exclude" == --exclude* ]]; then
-            tar_args+=("$exclude")
-        fi
-    done
-
-    tar_args+=("--file=$output_path")
+    local tar_args
+    mapfile -t tar_args < <(build_tar_args "$COMPRESSION_TYPE" "$output_path" "${RSYNC_EXCLUDES[@]}" | tr '\0' '\n')
 
     # For multi-origin, we need to be careful about the working directory
     # Add all paths - tar will handle relative paths from current directory

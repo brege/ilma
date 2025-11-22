@@ -126,22 +126,26 @@ if [[ "$HELP_REQUESTED" == "true" && -n "$HELP_COMMAND" ]]; then
             ;;
         extract)
             cat <<EOF
-Usage: ilma extract [OPTIONS] <archive_file>
+Usage: ilma extract [OPTIONS] <archive_file> [TARGET_DIR]
 
 Safely extract archive to contained directory (prevents tarbombs).
 
-Creates a directory based on the archive name and extracts contents there.
 Supports all compression formats: .tar.zst, .tar.gz, .tar.bz2, .tar.xz, etc.
 
 OPTIONS:
   --force            Replace existing target directory if it exists
   --target DIR       Extract to specific directory instead of auto-generated name
 
+ARGUMENTS:
+  archive_file       Path to the archive to extract
+  TARGET_DIR         Optional: directory to extract to (alternative to --target)
+
 Examples:
   ilma extract project.tar.zst             # Extracts to project/
   ilma extract backup.tar.gz               # Extracts to backup/
-  ilma extract --force project.tar.zst     # Replace existing project/ directory
-  ilma extract --target temp backup.tar.gz # Extract to temp/ directory
+  ilma extract project.tar.zst custom      # Extracts to custom/
+  ilma extract --force project.tar.zst     # Replace existing project/
+  ilma extract --target temp backup.tar.gz # Extract to temp/
 EOF
             exit 0
             ;;
@@ -437,8 +441,13 @@ else
                 ADDITIONAL_PATHS=()
                 shift
                 while [[ $# -gt 0 && "$1" != --* ]]; do
-                    resolved_path="$(realpath "$1" 2>/dev/null)" || { echo "Error: Invalid path '$1'"; exit 1; }
-                    ADDITIONAL_PATHS+=("$resolved_path")
+                    # For extract command, allow non-existent paths (target directory)
+                    if [[ "$COMMAND" == "extract" ]]; then
+                        ADDITIONAL_PATHS+=("$1")
+                    else
+                        resolved_path="$(realpath "$1" 2>/dev/null)" || { echo "Error: Invalid path '$1'"; exit 1; }
+                        ADDITIONAL_PATHS+=("$resolved_path")
+                    fi
                     shift
                 done
             else
@@ -920,7 +929,11 @@ case "$COMMAND" in
         ;;
     extract)
         source "$ILMA_DIR/commands/decrypt.sh"
-        do_extract "$PROJECT_ROOT" "$FORCE_FLAG" "$OUTDIR_FLAG"
+        target_dir="$OUTDIR_FLAG"
+        if [[ -z "$target_dir" && ${#ADDITIONAL_PATHS[@]} -gt 0 ]]; then
+            target_dir="${ADDITIONAL_PATHS[0]}"
+        fi
+        do_extract "$PROJECT_ROOT" "$FORCE_FLAG" "$target_dir"
         ;;
     *)
         echo "Error: Unknown command '$COMMAND'"
