@@ -76,3 +76,29 @@ get_compression_type_from_file() {
         *) echo "none" ;;
     esac
 }
+
+build_tar_args() {
+    local compression_type="$1"
+    local output_file="$2"
+    shift 2
+    local exclude_patterns=("$@")
+
+    local tar_args=("--create" "--ignore-failed-read" "--warning=no-failed-read")
+    local compression_option
+    compression_option=$(get_tar_option "$compression_type")
+    if [[ -n "$compression_option" ]]; then
+        local -a opts
+        read -r -a opts <<< "$compression_option"
+        tar_args+=("${opts[@]}")
+    fi
+
+    for exclude in "${exclude_patterns[@]}"; do
+        if [[ "$exclude" == --exclude* ]]; then
+            tar_args+=("$exclude")
+        fi
+    done
+
+    tar_args+=("--file=$output_file")
+
+    printf '%s\0' "${tar_args[@]}"
+}

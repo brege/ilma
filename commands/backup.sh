@@ -241,14 +241,12 @@ create_archive() {
         done
 
         # Create archive directly in target location with verbosity
-        local tar_option
-        tar_option=$(get_tar_option "$COMPRESSION_TYPE")
         echo "  - Creating archive: $archive_file (compression: $COMPRESSION_TYPE)"
-        if [[ -n "$tar_option" ]]; then
-            tar $tar_option -cvf "$archive_file" -C "$project_root" "${tar_excludes[@]}" .
-        else
-            tar -cvf "$archive_file" -C "$project_root" "${tar_excludes[@]}" .
-        fi
+        local tar_args
+        mapfile -t tar_args < <(build_tar_args "$COMPRESSION_TYPE" "$archive_file" "${tar_excludes[@]}" | tr '\0' '\n')
+        tar_args+=("-C" "$project_root")
+        tar_args+=(".")
+        tar -cv "${tar_args[@]}"
 
         if [[ $? -eq 0 ]]; then
             archive_size=$(du -sh "$archive_file" | cut -f1)
