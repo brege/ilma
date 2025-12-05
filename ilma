@@ -35,8 +35,7 @@ COMMANDS:
   validate                             Validate configuration and connectivity
   decrypt                              Decrypt GPG-encrypted archive
   extract                              Safely extract archive (prevents tarbombs)
-  pull                                 Run remote pull jobs (alias of `remote pull`)
-  remote                               Run remote pull jobs (stage + backup)
+  remote pull                          Run remote pull jobs
 
 BACKUP OPTIONS:
   -b, --backup [OUTPUT_PATH]           Create backup directory (explicit)
@@ -84,6 +83,7 @@ EXAMPLES:
   ilma prune --type latex --delete     Delete LaTeX project junk (no backup)
   ilma config                          Show effective configuration
   ilma decrypt file.tar.zst.gpg        Decrypt and extract GPG-encrypted archive
+  ilma remote pull -j user@server.ini  Backup remote paths with rsync filter rules
   ilma extract archive.tar.zst         Safely extract archive to contained directory
 
 CONFIGURATION:
