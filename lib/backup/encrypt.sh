@@ -21,8 +21,9 @@ create_gpg() {
     source "$ILMA_DIR/lib/deps/gpg.sh"
 
     # Determine output path
+    local compression_type="${COMPRESSION_TYPE:-}"
     if [[ -z "$output_path" ]]; then
-        output_path="$(dirname "$project_root")/${project_name}$(get_archive_extension "$COMPRESSION_TYPE")${GPG_OUTPUT_EXTENSION:-.gpg}"
+        output_path="$(dirname "$project_root")/${project_name}$(get_archive_extension "$compression_type")${GPG_OUTPUT_EXTENSION:-.gpg}"
     fi
 
     echo "Creating encrypted archive: $output_path"
@@ -30,7 +31,7 @@ create_gpg() {
     # Build tar command with exclusions for pipeline
     local tar_args=("--create")
     local compression_option
-    compression_option=$(get_tar_option "$COMPRESSION_TYPE")
+    compression_option=$(get_tar_option "$compression_type")
     [[ -n "$compression_option" ]] && tar_args+=("$compression_option")
 
     # Add exclusions
@@ -69,7 +70,8 @@ create_gpg() {
     fi
 
     # Build tar and gpg command strings for pipeline execution
-    local tar_cmd="tar $(printf '%q ' "${tar_args[@]}")"
+    local tar_cmd
+    tar_cmd="tar $(printf '%q ' "${tar_args[@]}")"
     local gpg_cmd="gpg --yes --batch --encrypt --recipient '$GPG_KEY_ID' --trust-model always --quiet -o '$output_path'"
 
     # Execute tar→gpg pipeline with progress indicator and compression ratio reporting
@@ -125,10 +127,11 @@ create_multi_origin_gpg() {
     fi
 
     # Generate output path if not provided
+    local compression_type="${COMPRESSION_TYPE:-}"
     if [[ -z "$output_path" ]]; then
         local timestamp
         timestamp="$(date '+%Y%m%d-%H%M%S')"
-        output_path="./multi-origin-${timestamp}$(get_archive_extension "$COMPRESSION_TYPE")${GPG_OUTPUT_EXTENSION:-.gpg}"
+        output_path="./multi-origin-${timestamp}$(get_archive_extension "$compression_type")${GPG_OUTPUT_EXTENSION:-.gpg}"
     fi
 
     echo "Creating multi-origin encrypted archive: $output_path"
@@ -141,7 +144,7 @@ create_multi_origin_gpg() {
     # Build tar command with exclusions for pipeline
     local tar_args=("--create")
     local compression_option
-    compression_option=$(get_tar_option "$COMPRESSION_TYPE")
+    compression_option=$(get_tar_option "$compression_type")
     [[ -n "$compression_option" ]] && tar_args+=("$compression_option")
 
     # Add exclusions
@@ -169,7 +172,8 @@ create_multi_origin_gpg() {
     fi
 
     # Build tar and gpg command strings for pipeline execution
-    local tar_cmd="tar $(printf '%q ' "${tar_args[@]}")"
+    local tar_cmd
+    tar_cmd="tar $(printf '%q ' "${tar_args[@]}")"
     local gpg_cmd="gpg --yes --batch --encrypt --recipient '$GPG_KEY_ID' --trust-model always --quiet -o '$output_path'"
 
     # Execute tar→gpg pipeline with progress indicator and compression ratio reporting

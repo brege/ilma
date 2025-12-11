@@ -1,0 +1,23 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: ShellCheck
+        run: |
+          set -euo pipefail
+          shellcheck $(find . -name '*.sh' -type f)
+
+      - name: Run test suite
+        run: |
+          set -euo pipefail
+          bash tests/run.sh

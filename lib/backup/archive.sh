@@ -8,6 +8,7 @@ source "$ILMA_DIR/lib/functions.sh"
 resolve_archive_path_with_deduplication() {
     local base_path="$1"
     local naming_strategy="${ARCHIVE_VERSIONING:-timestamp}"
+    local compression_type="${COMPRESSION_TYPE:-}"
 
     # If file doesn't exist, use it as-is
     if [[ ! -f "$base_path" ]]; then
@@ -20,14 +21,14 @@ resolve_archive_path_with_deduplication() {
             local timestamp
             timestamp="$(date '+%Y%m%d-%H%M%S')"
             local archive_ext
-            archive_ext="$(get_archive_extension "$COMPRESSION_TYPE")"
+            archive_ext="$(get_archive_extension "$compression_type")"
             local basename="${base_path%"$archive_ext"}"
             echo "${basename}-${timestamp}${archive_ext}"
             ;;
         "numbered")
             local counter=1
             local archive_ext
-            archive_ext="$(get_archive_extension "$COMPRESSION_TYPE")"
+            archive_ext="$(get_archive_extension "$compression_type")"
             local basename="${base_path%"$archive_ext"}"
             local numbered_path="${basename}.${counter}${archive_ext}"
             while [[ -f "$numbered_path" ]]; do
@@ -44,7 +45,7 @@ resolve_archive_path_with_deduplication() {
             local timestamp
             timestamp="$(date '+%Y%m%d-%H%M%S')"
             local archive_ext
-            archive_ext="$(get_archive_extension "$COMPRESSION_TYPE")"
+            archive_ext="$(get_archive_extension "$compression_type")"
             local basename="${base_path%"$archive_ext"}"
             echo "${basename}-${timestamp}${archive_ext}"
             ;;
@@ -80,18 +81,19 @@ create_archive_only() {
     local output_path="$2"
     local project_name
     project_name="$(basename "$project_root")"
+    local compression_type="${COMPRESSION_TYPE:-}"
 
 
     if [[ -z "$output_path" ]]; then
         # Default: create archive in parent directory with versioning
         local base_output_path
-        base_output_path="$(dirname "$project_root")/${project_name}$(get_archive_extension "$COMPRESSION_TYPE")"
+        base_output_path="$(dirname "$project_root")/${project_name}$(get_archive_extension "$compression_type")"
         if [[ "$ARCHIVE_VERSIONING" == "force_timestamp" ]]; then
             # Force timestamp even if file doesn't exist
             local timestamp
             timestamp="$(date '+%Y%m%d-%H%M%S')"
             local archive_ext
-            archive_ext="$(get_archive_extension "$COMPRESSION_TYPE")"
+            archive_ext="$(get_archive_extension "$compression_type")"
             local basename="${base_output_path%"$archive_ext"}"
             output_path="${basename}-${timestamp}${archive_ext}"
         else
@@ -114,7 +116,7 @@ create_archive_only() {
 
     # Build tar command with exclusions
     local tar_args
-    mapfile -t tar_args < <(build_tar_args "$COMPRESSION_TYPE" "$output_path" "${RSYNC_EXCLUDES[@]}" | tr '\0' '\n')
+    mapfile -t tar_args < <(build_tar_args "$compression_type" "$output_path" "${RSYNC_EXCLUDES[@]}" | tr '\0' '\n')
 
     if [[ "$is_single_target" == "true" ]]; then
         # Single directory case: archive contents directly to avoid nesting
@@ -157,15 +159,16 @@ create_multi_origin_archive() {
     fi
 
     # Generate output path if not provided
+    local compression_type="${COMPRESSION_TYPE:-}"
     if [[ -z "$output_path" ]]; then
         local base_output_path
-        base_output_path="./multi-origin$(get_archive_extension "$COMPRESSION_TYPE")"
+        base_output_path="./multi-origin$(get_archive_extension "$compression_type")"
         if [[ "$ARCHIVE_VERSIONING" == "force_timestamp" ]]; then
             # Force timestamp even if file doesn't exist
             local timestamp
             timestamp="$(date '+%Y%m%d-%H%M%S')"
             local archive_ext
-            archive_ext="$(get_archive_extension "$COMPRESSION_TYPE")"
+            archive_ext="$(get_archive_extension "$compression_type")"
             local basename="${base_output_path%"$archive_ext"}"
             output_path="${basename}-${timestamp}${archive_ext}"
         else
@@ -181,7 +184,7 @@ create_multi_origin_archive() {
 
     # Build tar command with exclusions
     local tar_args
-    mapfile -t tar_args < <(build_tar_args "$COMPRESSION_TYPE" "$output_path" "${RSYNC_EXCLUDES[@]}" | tr '\0' '\n')
+    mapfile -t tar_args < <(build_tar_args "$compression_type" "$output_path" "${RSYNC_EXCLUDES[@]}" | tr '\0' '\n')
 
     # For multi-origin, we need to be careful about the working directory
     # Add all paths - tar will handle relative paths from current directory
