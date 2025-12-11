@@ -30,7 +30,7 @@ add_types_from_dir() {
 if builtin_dir="$(get_ilma_builtin_projects_dir)"; then
     add_types_from_dir "$builtin_dir"
 fi
-if user_dir="$(get_ilma_user_projects_dir)"; then
+if user_dir="$(get_ilma_user_projects_dir)" && [[ -n "$user_dir" ]]; then
     add_types_from_dir "$user_dir"
 fi
 
@@ -246,3 +246,5 @@ done
 if [[ "$PRETTY_OUTPUT" == "true" ]]; then
     echo -e "${YELLOW}Dry run complete: no files deleted${RESET}"
 fi
+
+exit 0
