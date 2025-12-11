@@ -33,7 +33,11 @@ ilma --help
 By default, **ilma** will backup the current directory and store a copy as a sibling.
 
 ```bash
-ilma
+cd my-project
+ilma -a
+ls ../
+# my-project/
+# my-project.tar.zst
 ```
 
 **Prune crufty project files**
@@ -54,6 +58,9 @@ ilma --encrypt \
      --remote server.local:/storage/backups \
      --type latex \
      ~/dissertation
+
+ssh server.local ls /storage/backups
+# dissertation.tar.zst.gpg
 ```
 
 **Config Validation**  
@@ -61,7 +68,8 @@ ilma --encrypt \
 ilma validate
 
 ```
-**Context Overview**
+**Context Overview**  
+Generate a token estimate of project context before and after pruning
 ```bash
 ilma console 
 ```
@@ -77,7 +85,7 @@ cd ilma
 Fedora dependencies
 ```bash
 sudo dnf install rsync tree git zstd bc pv
-# all compression tools (only need one)
+# compression tools (configure: you only need one)
 sudo dnf install zstd gzip bzip2 xz
 ```
 
