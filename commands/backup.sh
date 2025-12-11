@@ -115,8 +115,8 @@ do_backup() {
         echo "Main backup complete."
     }
 
-    # Only do XDG backup, context mirror, and stats in configured mode
-    if [[ "$CONFIG_FOUND" == "true" ]]; then
+    # Create context mirror when config found or type config loaded
+    if [[ "$CONFIG_FOUND" == "true" || "$TYPE_CONFIG_LOADED" == "true" ]]; then
         # --- Step 1a: Backup XDG directories if enabled ---
         if [[ "$BACKUP_XDG_DIRS" == "true" ]]; then
             echo "Step 1a: Backing up XDG directories..."
