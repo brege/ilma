@@ -21,5 +21,9 @@ fi
 backup_directory_path="$(find "$temporary_root" -maxdepth 1 -type d -name 'dummy-project-python*.bak' | head -n 1)"
 assert_not_empty "$backup_directory_path"
 assert_file_exists "$backup_directory_path"
-context_path="$backup_directory_path/dummy-project-python.context"
+context_path="$(find "$temporary_root" -type d -name 'dummy-project-python.context' | head -n 1)"
+assert_not_empty "$context_path"
 assert_file_exists "$context_path"
+if [[ "$context_path" == "$backup_directory_path/"* ]]; then
+    fail "Context directory should not be inside backup directory"
+fi

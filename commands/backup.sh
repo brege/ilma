@@ -90,9 +90,9 @@ do_backup() {
         MIRROR_DIR=$(resolve_base_dir "$CONTEXT_BASE_DIR" "$project_root" "$project_name" ".context")
         MIRROR_DIR_BASENAME="$(basename "$MIRROR_DIR")"
     else
-        # Default: nested in backup directory
+        # Default: sibling to project (not inside .bak)
         MIRROR_DIR_BASENAME="${project_name}.context"
-        MIRROR_DIR="$MAIN_BACKUP_DIR/$MIRROR_DIR_BASENAME"
+        MIRROR_DIR="$(dirname "$project_root")/$MIRROR_DIR_BASENAME"
     fi
 
     # Always create backup directory

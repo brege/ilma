@@ -16,5 +16,6 @@ project_path="$temporary_root/dummy-project-python"
 run_command --workdir "$repository_root" "$repository_root/ilma" --context "$project_path" --type python
 assert_exit 0
 
-context_path="$temporary_root/dummy-project-python"
+context_path="$(find "$temporary_root" -maxdepth 1 -type d -name 'dummy-project-python.context' | head -n 1)"
+assert_not_empty "$context_path"
 assert_file_exists "$context_path"

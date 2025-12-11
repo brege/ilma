@@ -34,9 +34,17 @@ create_context_only() {
     local project_name
     project_name="$(basename "$project_root")"
 
-    if [[ -z "$output_path" ]]; then
-        # Use unified path resolution with CONTEXT_BASE_DIR
-        output_path=$(resolve_base_dir "$CONTEXT_BASE_DIR" "$project_root" "$project_name" ".context")
+    # Use unified path resolution with CONTEXT_BASE_DIR
+    local default_context_path
+    default_context_path=$(resolve_base_dir "$CONTEXT_BASE_DIR" "$project_root" "$project_name" ".context")
+
+    if [[ -z "$output_path" || "$output_path" == "$project_root" || "$output_path" == "$project_root/" ]]; then
+        output_path="$default_context_path"
+    fi
+
+    # Ensure context suffix is present when not explicitly provided
+    if [[ "$output_path" != *".context" ]]; then
+        output_path="${output_path}.context"
     fi
 
     echo "Creating context mirror: $output_path"
