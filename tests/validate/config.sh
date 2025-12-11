@@ -13,7 +13,6 @@ run_command --workdir "$repository_root" "$repository_root/tools/make-dummies.sh
 assert_exit 0
 
 project_path="$temporary_root/dummy-project-python"
-run_command --workdir "$repository_root" "$repository_root/ilma" prune --type python "$project_path"
+run_command --workdir "$repository_root" "$repository_root/ilma" validate --config "$project_path"
 assert_exit 0
-assert_contains "$COMMAND_STDOUT" "Prune analysis for: dummy-project-python"
-assert_contains "$COMMAND_STDOUT" "Found 6 junk items"
+assert_contains "$COMMAND_STDOUT" "Basic Configuration"

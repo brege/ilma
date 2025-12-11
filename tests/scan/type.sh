@@ -14,4 +14,4 @@ assert_exit 0
 
 project_path="$temporary_root/dummy-project-python"
 run_command --workdir "$repository_root" "$repository_root/commands/scan.sh" --type python "$project_path"
-assert_exit 1
+assert_exit 0

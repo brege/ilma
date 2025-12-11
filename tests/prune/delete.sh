@@ -13,7 +13,10 @@ run_command --workdir "$repository_root" "$repository_root/tools/make-dummies.sh
 assert_exit 0
 
 project_path="$temporary_root/dummy-project-python"
-run_command --workdir "$repository_root" "$repository_root/ilma" prune --type python "$project_path"
+run_command --workdir "$repository_root" "$repository_root/ilma" prune --pattern '*.pyc' --delete "$project_path"
 assert_exit 0
-assert_contains "$COMMAND_STDOUT" "Prune analysis for: dummy-project-python"
-assert_contains "$COMMAND_STDOUT" "Found 6 junk items"
+
+remaining_count="$(find "$project_path" -name '*.pyc' | wc -l)"
+if [[ "$remaining_count" -ne 0 ]]; then
+    fail "Expected pyc files to be deleted, found $remaining_count"
+fi

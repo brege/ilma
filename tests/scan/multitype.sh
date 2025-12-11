@@ -12,8 +12,7 @@ trap 'rm -rf "$temporary_root"' EXIT
 run_command --workdir "$repository_root" "$repository_root/tools/make-dummies.sh" "$temporary_root"
 assert_exit 0
 
-project_path="$temporary_root/dummy-project-python"
-run_command --workdir "$repository_root" "$repository_root/ilma" prune --type python "$project_path"
+project_path="$temporary_root/dummy-project-js"
+run_command --workdir "$repository_root" "$repository_root/commands/scan.sh" --type 'node|python' "$project_path"
 assert_exit 0
-assert_contains "$COMMAND_STDOUT" "Prune analysis for: dummy-project-python"
-assert_contains "$COMMAND_STDOUT" "Found 6 junk items"
+assert_contains "$COMMAND_STDOUT" "dist/"

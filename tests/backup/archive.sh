@@ -13,7 +13,9 @@ run_command --workdir "$repository_root" "$repository_root/tools/make-dummies.sh
 assert_exit 0
 
 project_path="$temporary_root/dummy-project-python"
-run_command --workdir "$repository_root" "$repository_root/ilma" prune --type python "$project_path"
+run_command --workdir "$repository_root" "$repository_root/ilma" --archive "$project_path" --type python
 assert_exit 0
-assert_contains "$COMMAND_STDOUT" "Prune analysis for: dummy-project-python"
-assert_contains "$COMMAND_STDOUT" "Found 6 junk items"
+
+archive_path="$(find "$temporary_root" -maxdepth 1 -type f -name 'dummy-project-python-*.tar.zst' | head -n 1)"
+assert_not_empty "$archive_path"
+assert_file_exists "$archive_path"
