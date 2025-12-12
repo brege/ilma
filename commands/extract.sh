@@ -15,7 +15,7 @@ extract_usage() {
     cat <<'EOF'
 Usage: ilma extract [OPTIONS] <archive_file> [TARGET_DIR]
 
-Safely extract an archive to a contained directory (prevents tarbombs).
+Safely extract archive to a contained directory (prevents tarbombs).
 
 OPTIONS:
   --force            Replace existing target directory
