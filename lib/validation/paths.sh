@@ -15,7 +15,6 @@ config_path=""
 if config_path="$(get_ilma_global_config_path)"; then
     BACKUP_BASE_DIR=$(grep -E '^\s*backup_base_dir\s*=' "$config_path" 2>/dev/null | cut -d'=' -f2 | tr -d ' ' || echo "")
     ARCHIVE_BASE_DIR=$(grep -E '^\s*archive_base_dir\s*=' "$config_path" 2>/dev/null | cut -d'=' -f2 | tr -d ' ' || echo "")
-    CONTEXT_BASE_DIR=$(grep -E '^\s*context_base_dir\s*=' "$config_path" 2>/dev/null | cut -d'=' -f2 | tr -d ' ' || echo "")
 fi
 
 # Load from project config (overrides)
@@ -54,18 +53,5 @@ if [[ -n "$ARCHIVE_BASE_DIR" ]]; then
         fi
     else
         echo "WARN:Archive directory:Directory '$ARCHIVE_BASE_DIR' does not exist (will be created)"
-    fi
-fi
-
-# Check context directory
-if [[ -n "$CONTEXT_BASE_DIR" ]]; then
-    if [[ -d "$CONTEXT_BASE_DIR" ]]; then
-        if [[ -w "$CONTEXT_BASE_DIR" ]]; then
-            echo "PASS:Context directory writable ($CONTEXT_BASE_DIR)"
-        else
-            echo "FAIL:Context directory permissions:Directory '$CONTEXT_BASE_DIR' not writable"
-        fi
-    else
-        echo "WARN:Context directory:Directory '$CONTEXT_BASE_DIR' does not exist (will be created)"
     fi
 fi

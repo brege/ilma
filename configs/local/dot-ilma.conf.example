@@ -38,17 +38,6 @@ RSYNC_EXCLUDES=(
 )
 
 # =============================================================================
-# CONTEXT FILES (additional files to include in context mirror)
-# =============================================================================
-
-# Files to copy to context mirror even if not in main backup
-CONTEXT_FILES=(
-#   "AGENTS.md"
-#   "agents/STYLEGUIDE.md"
-#    # Add more context files as needed
-)
-
-# =============================================================================
 # STATISTICS SCOPE (for 'ilma console' command only)
 # =============================================================================
 
@@ -69,16 +58,15 @@ EXTENSIONS=(
 # =============================================================================
 
 # Base directories for backup operations
-# Directory resolution for backup/archive/context operations:
-# <unset/empty> = sibling to target (DEFAULT): ilma dummy/ → dummy.bak, dummy.tar.zst, dummy.context
-# ".."          = same as default (sibling): ilma dummy/ → dummy.bak, dummy.tar.zst, dummy.context  
-# "."           = inside target: ilma dummy/ → dummy/dummy.bak, dummy/dummy.context
+# Directory resolution for backup/archive operations:
+# <unset/empty> = sibling to target (DEFAULT): ilma dummy/ → dummy.bak, dummy.tar.zst
+# ".."          = same as default (sibling): ilma dummy/ → dummy.bak, dummy.tar.zst
+# "."           = inside target: ilma dummy/ → dummy/dummy.bak
 # "."           = ERROR for archive_base_dir (archives inside targets don't make sense)
 # "/abs/path"   = absolute path: ilma dummy/ → /abs/path/dummy.bak
 # "rel/path"    = relative to target: ilma dummy/ → dummy/rel/path/dummy.bak
 #BACKUP_BASE_DIR=""                     # Where to create .bak directories
 #ARCHIVE_BASE_DIR=""                    # Where to create compressed archives  
-#CONTEXT_BASE_DIR=""                    # Where to create context mirrors
 
 # Archive creation settings
 #CREATE_COMPRESSED_ARCHIVE=true         # Create compressed archive after backup
@@ -91,9 +79,6 @@ EXTENSIONS=(
                                         # numbered:  project.1.bak, project.2.bak
                                         # overwrite: always use project.bak (overwrite existing)
 
-# XDG directory backup (config, cache, local data)
-#BACKUP_XDG_DIRS=false                  # Include ~/.config, ~/.local/share, ~/.cache
-#XDG_PATHS=("$HOME/.config" "$HOME/.local/share" "$HOME/.cache")
 
 # =============================================================================
 # COMPRESSION SETTINGS (override global config.ini)

@@ -4,7 +4,6 @@ set -euo pipefail
 source "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/_template.sh"
 template_initialize_paths
 
-ILMA_DIR="${ILMA_DIR}"
 source "$ILMA_DIR/lib/configs.sh"
 
 type_name=""
@@ -42,10 +41,8 @@ load_ini_config() {
                 backup.naming) VERSIONING="$value" ;;
                 backup.archive_naming) ARCHIVE_VERSIONING="$value" ;;
                 backup.encrypt_naming) ENCRYPT_VERSIONING="$value" ;;
-                backup.backup_xdg_dirs) BACKUP_XDG_DIRS="$value" ;;
                 backup.backup_base_dir) BACKUP_BASE_DIR="$value" ;;
                 backup.archive_base_dir) ARCHIVE_BASE_DIR="$value" ;;
-                backup.context_base_dir) CONTEXT_BASE_DIR="$value" ;;
                 rsync.remote_server) REMOTE_SERVER="$value" ;;
                 rsync.remote_path) REMOTE_PATH="$value" ;;
                 rsync.cleanup_after_transfer) CLEANUP_AFTER_TRANSFER="$value" ;;
@@ -65,18 +62,13 @@ load_config() {
     # Set default configuration variables
     BACKUP_BASE_DIR=""
     ARCHIVE_BASE_DIR=""
-    CONTEXT_BASE_DIR=""
     CREATE_COMPRESSED_ARCHIVE=false
     MAX_ARCHIVES=5
     VERSIONING="timestamp"
     ARCHIVE_VERSIONING="timestamp"
     ENCRYPT_VERSIONING="timestamp"
-    BACKUP_XDG_DIRS=false
-    XDG_PATHS=("$HOME/.config" "$HOME/.local/share" "$HOME/.cache")
     EXTENSIONS=(md txt)
     RSYNC_EXCLUDES=()
-    CONTEXT_FILES=()
-    TREE_EXCLUDES=""
     COMPRESSION_TYPE="zstd"
     COMPRESSION_LEVEL="3"
     REMOTE_SERVER=""
@@ -140,8 +132,6 @@ handle_special_modes() {
         RSYNC_EXCLUDES=()  # No exclusions - archive everything
         CREATE_COMPRESSED_ARCHIVE=true
         ARCHIVE_BASE_DIR="$(dirname "$archive_flag")"
-        BACKUP_XDG_DIRS=false
-        CONTEXT_BASE_DIR=""  # No context mirror
         CONFIG_FOUND="false"  # Skip normal workflow
         echo "Archive mode: creating complete image at $archive_flag"
     elif [[ "$CONFIG_FOUND" == "false" ]]; then
@@ -160,8 +150,6 @@ handle_special_modes() {
         CREATE_COMPRESSED_ARCHIVE=true
         # Archive to parent directory by default (like tar stash behavior)
         ARCHIVE_BASE_DIR="$(dirname "$(realpath "$project_root")")"
-        BACKUP_XDG_DIRS=false
-        CONTEXT_BASE_DIR=""  # No context mirror in fallback mode
 
         if [[ "$TYPE_CONFIG_LOADED" == "true" ]]; then
             echo "Type configuration loaded - creating archive in current directory"
@@ -186,10 +174,9 @@ OPTIONS:
 DESCRIPTION:
   Shows the effective configuration for a project, including:
   - Whether a local .ilma.conf file was found
-  - Resolved backup, archive, and context directory paths
+  - Resolved backup and archive directory paths
   - Archive creation settings and limits
   - File extensions being tracked
-  - XDG directory backup settings
 
   This is useful for troubleshooting configuration issues and
   understanding which settings will be applied during backup operations.
@@ -228,11 +215,6 @@ show_config() {
         else
             echo "  ARCHIVE_BASE_DIR  = (not set)"
         fi
-        if [[ -n "$CONTEXT_BASE_DIR" ]]; then
-            echo "  CONTEXT_BASE_DIR  = $(realpath -m "${CONTEXT_BASE_DIR/#\~/$HOME}")"
-        else
-            echo "  CONTEXT_BASE_DIR  = (nested in backup)"
-        fi
         echo
         echo "Settings:"
         echo "  CREATE_COMPRESSED_ARCHIVE = $CREATE_COMPRESSED_ARCHIVE"
@@ -240,7 +222,6 @@ show_config() {
         echo "  VERSIONING   = $VERSIONING"
         echo "  ARCHIVE_VERSIONING = $ARCHIVE_VERSIONING"
         echo "  ENCRYPT_VERSIONING = $ENCRYPT_VERSIONING"
-        echo "  BACKUP_XDG_DIRS          = $BACKUP_XDG_DIRS"
         echo "  EXTENSIONS               = (${EXTENSIONS[*]})"
     else
         local fallback_archive_dir

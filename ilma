@@ -9,7 +9,7 @@ show_main_help() {
 Usage: ilma [COMMAND] [OPTIONS] [PROJECT_PATH]
 
 COMMANDS:
-  backup       Create backup and context mirror (default)
+  backup       Create backup (default)
   console      Show project statistics
   scan         Scan project files and detect junk
   prune        Dry-run analysis of files to clean (no deletion)

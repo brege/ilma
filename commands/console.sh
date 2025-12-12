@@ -66,9 +66,9 @@ show_console_summary() {
     HAS_MIRROR=false
 
     if [[ "$CONFIG_FOUND" == "true" ]]; then
-        # Set mirror directory path (same logic as backup.sh)
-        if [[ -n "$CONTEXT_BASE_DIR" ]]; then
-            MIRROR_DIR="$CONTEXT_BASE_DIR/$project_name"
+        local context_base_dir="${CONTEXT_BASE_DIR:-}"
+        if [[ -n "$context_base_dir" ]]; then
+            MIRROR_DIR="$context_base_dir/$project_name"
         else
             MAIN_BACKUP_DIR="$BACKUP_BASE_DIR/${project_name}.bak"
             MIRROR_DIR="$MAIN_BACKUP_DIR/$project_name"

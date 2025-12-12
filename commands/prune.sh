@@ -40,7 +40,7 @@ OPTIONS:
                    Available types: bash, latex, node, python, all
                    Multiple types: --type node --type python OR --type 'node|python'
   --pattern PATTERN Override config with custom pattern (e.g. "*.json", "Trash")
-  --verbose        Show detailed analysis with file paths and context
+  --verbose        Show detailed analysis with file paths
   --bak            Create complete backup before deleting files
   --delete         Delete junk files without creating backup (DANGEROUS)
   -h, --help       Show this help message
@@ -329,18 +329,6 @@ prune_main() {
     fi
 
     do_prune "$project_root" "$verbose_flag" "$type_name" "$delete_mode" "$pattern_override"
-
-    if [[ "$backup_option" == "true" && "$CONFIG_FOUND" == "true" ]]; then
-        echo
-        local mirror_directory
-        if [[ -n "$CONTEXT_BASE_DIR" ]]; then
-            mirror_directory="$CONTEXT_BASE_DIR/$project_name"
-        else
-            MAIN_BACKUP_DIR="$BACKUP_BASE_DIR/${project_name}.bak"
-            mirror_directory="$MAIN_BACKUP_DIR/$project_name"
-        fi
-        show_backup_stats "$project_root" "$mirror_directory"
-    fi
 }
 
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then

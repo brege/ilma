@@ -10,12 +10,10 @@ source "$ILMA_DIR/lib/deps/rsync.sh"
 source "$ILMA_DIR/lib/deps/gpg.sh"
 source "$ILMA_DIR/commands/config.sh"
 source "$ILMA_DIR/lib/backup/archive.sh"
-source "$ILMA_DIR/lib/backup/context.sh"
 source "$ILMA_DIR/lib/backup/encrypt.sh"
 source "$ILMA_DIR/lib/backup/remote.sh"
 source "$ILMA_DIR/lib/singles.sh"
 source "$ILMA_DIR/lib/validation/verify.sh"
-source "$ILMA_DIR/commands/console.sh"
 
 backup_requested=false
 backup_output=""
@@ -23,8 +21,6 @@ archive_requested=false
 archive_output=""
 encrypt_requested=false
 encrypt_output=""
-context_requested=false
-context_output=""
 remote_target=""
 type_name=""
 target_directory=""
@@ -38,18 +34,17 @@ backup_usage() {
     cat <<'EOF'
 Usage: backup.sh [OPTIONS] [PROJECT_PATH] [ADDITIONAL_PATHS...]
 
-Create backup and context mirror for a project, or produce archives and encrypted archives.
+Create backups, archives, and encrypted archives for a project.
 
 OPTIONS:
   -b, --backup [OUTPUT_PATH]     Create backup directory (explicit)
   -a, --archive [OUTPUT_PATH]    Create compressed archive only
   -e, --encrypt [OUTPUT_PATH]    Create encrypted archive only
-  -c, --context [OUTPUT_PATH]    Create context mirror only
   -r, --remote SERVER:/PATH      Sync directly to remote server
   --type TYPE                    Project type configuration
   --target DIR                   Output directory for generated artifacts
   --basename NAME                Custom base filename for archives
-  --verify                       Verify outputs (archives or mirrors)
+  --verify                       Verify outputs (archives)
   --timestamp                    Append timestamp to archive filename
   --config                       Show resolved configuration and exit
   -h, --help                     Show this help message
@@ -58,7 +53,7 @@ ARGUMENTS:
   PROJECT_PATH                   Project directory or file (default: current directory)
   ADDITIONAL_PATHS               Extra roots for multi-origin archive/encrypt
 
-Default behavior runs a full backup with context mirror when no operation flags are provided.
+Default behavior runs a full backup when no operation flags are provided.
 EOF
 }
 
@@ -130,17 +125,9 @@ do_backup() {
     base_backup_path=$(resolve_base_dir "$BACKUP_BASE_DIR" "$project_root" "$project_name" ".bak")
     MAIN_BACKUP_DIR=$(resolve_backup_dir_with_deduplication "$base_backup_path")
 
-    if [[ -n "$CONTEXT_BASE_DIR" ]]; then
-        MIRROR_DIR=$(resolve_base_dir "$CONTEXT_BASE_DIR" "$project_root" "$project_name" ".context")
-        MIRROR_DIR_BASENAME="$(basename "$MIRROR_DIR")"
-    else
-        MIRROR_DIR_BASENAME="${project_name}.context"
-        MIRROR_DIR="$(dirname "$project_root")/$MIRROR_DIR_BASENAME"
-    fi
-
     echo "Step 1: Creating main full backup at '$MAIN_BACKUP_DIR'..."
     mkdir -p "$MAIN_BACKUP_DIR"
-    BACKUP_EXCLUDES=(--exclude "$MIRROR_DIR_BASENAME/")
+    BACKUP_EXCLUDES=()
 
     if [[ "$MAIN_BACKUP_DIR" == "$project_root"/* ]]; then
         local backup_basename
@@ -153,70 +140,6 @@ do_backup() {
     smart_copy "$project_root" "$MAIN_BACKUP_DIR" "${backup_rsync_args[@]}" "${BACKUP_EXCLUDES[@]}"
     echo "Main backup complete."
 
-    if [[ "$CONFIG_FOUND" == "true" || "$TYPE_CONFIG_LOADED" == "true" ]]; then
-        if [[ "$BACKUP_XDG_DIRS" == "true" ]]; then
-            echo "Step 1a: Backing up XDG directories..."
-            XDG_BACKUP_DIR="$MAIN_BACKUP_DIR/xdg"
-            mkdir -p "$XDG_BACKUP_DIR"
-
-            for xdg_base in "${XDG_PATHS[@]}"; do
-                local xdg_expanded
-                xdg_expanded="${xdg_base/#\~/$HOME}"
-                local project_xdg_dir
-                project_xdg_dir="$xdg_expanded/$project_name"
-
-                if [[ -d "$project_xdg_dir" ]]; then
-                    local -a xdg_rsync_args=()
-                    ilma_append_rsync_preserve_args xdg_rsync_args
-                    xdg_rsync_args+=(--info=progress2 --partial)
-                    local xdg_rel_path
-                    xdg_rel_path="${xdg_base#~/}"
-                    local backup_dest
-                    backup_dest="$XDG_BACKUP_DIR/$xdg_rel_path"
-                    mkdir -p "$backup_dest"
-
-                    smart_copy "$project_xdg_dir" "$backup_dest/$project_name" "${xdg_rsync_args[@]}"
-                    echo "  - Backed up $project_xdg_dir"
-                fi
-            done
-            echo "XDG backup complete."
-        fi
-
-        echo
-
-        echo "Step 2: Creating context mirror at '$MIRROR_DIR'..."
-        mkdir -p "$MIRROR_DIR"
-
-        DYNAMIC_EXCLUDES=(
-            --exclude "$(basename "$MAIN_BACKUP_DIR")/"
-        )
-
-        if [[ -n "$CONTEXT_BASE_DIR" && "$CONTEXT_BASE_DIR" != "$BACKUP_BASE_DIR" ]]; then
-            local context_base_basename
-            context_base_basename="$(basename "$CONTEXT_BASE_DIR")"
-            if [[ "$project_root" == *"/$context_base_basename"* || "$project_root" == *"$context_base_basename" ]]; then
-                DYNAMIC_EXCLUDES+=(--exclude "$(basename "$CONTEXT_BASE_DIR")/")
-            fi
-        fi
-
-        CONTEXT_EXCLUDES=("--exclude" ".git/")
-        FINAL_EXCLUDES=("${RSYNC_EXCLUDES[@]}" "${DYNAMIC_EXCLUDES[@]}" "${CONTEXT_EXCLUDES[@]}")
-
-        local -a mirror_rsync_args=()
-        ilma_append_rsync_preserve_args mirror_rsync_args
-        mirror_rsync_args+=(--delete --delete-delay --info=progress2)
-        smart_copy "$project_root" "$MIRROR_DIR" "${mirror_rsync_args[@]}" "${FINAL_EXCLUDES[@]}"
-        echo "Context mirror created."
-        echo
-
-        source "$ILMA_DIR/hooks/tree.sh"
-        generate_tree_and_context "$project_root" "$project_name" "$MIRROR_DIR"
-
-        echo
-        echo "----------------------"
-        echo " ✔ Success: Context mirror is ready at: $MIRROR_DIR"
-        echo "----------------------"
-    fi
 }
 
 parse_backup_arguments() {
@@ -226,8 +149,6 @@ parse_backup_arguments() {
     archive_output=""
     encrypt_requested=false
     encrypt_output=""
-    context_requested=false
-    context_output=""
     remote_target=""
     type_name=""
     target_directory=""
@@ -242,18 +163,16 @@ parse_backup_arguments() {
         case "$argument" in
             -a) expanded_arguments+=(--archive) ;;
             -b) expanded_arguments+=(--backup) ;;
-            -c) expanded_arguments+=(--context) ;;
             -e) expanded_arguments+=(--encrypt) ;;
             -r) expanded_arguments+=(--remote) ;;
             -*)
-                if [[ "$argument" =~ ^-[abce]{2,}$ ]]; then
+                if [[ "$argument" =~ ^-[abe]{2,}$ ]]; then
                     local combined_flags="${argument#-}"
                     local index
                     for ((index=0; index<${#combined_flags}; index++)); do
                         case "${combined_flags:index:1}" in
                             a) expanded_arguments+=(--archive) ;;
                             b) expanded_arguments+=(--backup) ;;
-                            c) expanded_arguments+=(--context) ;;
                             e) expanded_arguments+=(--encrypt) ;;
                         esac
                     done
@@ -293,15 +212,6 @@ parse_backup_arguments() {
                 encrypt_requested=true
                 if [[ -n "${2:-}" && "${2:0:1}" != "-" && "${2}" =~ \.gpg$ ]]; then
                     encrypt_output="$2"
-                    shift 2
-                else
-                    shift
-                fi
-                ;;
-            --context|-c)
-                context_requested=true
-                if [[ -n "${2:-}" && "${2:0:1}" != "-" && ( "${2}" =~ \.[a-z]+$ || "${2:0:1}" == "/" ) ]]; then
-                    context_output="$2"
                     shift 2
                 else
                     shift
@@ -481,19 +391,13 @@ backup_main() {
     if [[ "$backup_requested" == "true" ]]; then
         if [[ -n "$target_directory" ]]; then
             local original_backup_base_dir="$BACKUP_BASE_DIR"
-            local original_context_base_dir="$CONTEXT_BASE_DIR"
             BACKUP_BASE_DIR="$target_directory"
-            CONTEXT_BASE_DIR="$target_directory"
             do_backup "$project_root"
             BACKUP_BASE_DIR="$original_backup_base_dir"
-            CONTEXT_BASE_DIR="$original_context_base_dir"
         else
             do_backup "$project_root"
         fi
         operations_performed=true
-        if [[ "$verify_option" == "true" ]]; then
-            verify_mirror_integrity "$project_root" "$MAIN_BACKUP_DIR" || true
-        fi
     fi
 
     if [[ "$archive_requested" == "true" ]]; then
@@ -670,24 +574,6 @@ backup_main() {
         fi
     fi
 
-    if [[ "$context_requested" == "true" ]]; then
-        local output_path="$context_output"
-        if [[ -n "$target_directory" && -z "$output_path" ]]; then
-            local project_name
-            project_name="$(basename "$project_root")"
-            output_path="$target_directory/${project_name}.context"
-        fi
-        create_context_only "$project_root" "$output_path"
-        operations_performed=true
-        if [[ "$verify_option" == "true" ]]; then
-            local final_context="$output_path"
-            if [[ -z "$final_context" ]]; then
-                final_context=$(resolve_base_dir "$CONTEXT_BASE_DIR" "$project_root" "$(basename "$project_root")" ".context")
-            fi
-            verify_mirror_integrity "$project_root" "$final_context" || true
-        fi
-    fi
-
     if [[ -n "$remote_target" && "$archive_requested" == "false" && "$encrypt_requested" == "false" ]]; then
         sync_to_remote "$project_root" "$remote_target"
         operations_performed=true
@@ -695,18 +581,6 @@ backup_main() {
 
     if [[ "$operations_performed" == "false" ]]; then
         do_backup "$project_root"
-        if [[ "$CONFIG_FOUND" == "true" ]]; then
-            local project_name
-            project_name="$(basename "$project_root")"
-            local mirror_dir_path
-            if [[ -n "$CONTEXT_BASE_DIR" ]]; then
-                mirror_dir_path="$CONTEXT_BASE_DIR/$project_name"
-            else
-                MAIN_BACKUP_DIR="$BACKUP_BASE_DIR/${project_name}.bak"
-                mirror_dir_path="$MAIN_BACKUP_DIR/$project_name"
-            fi
-            show_backup_stats "$project_root" "$mirror_dir_path"
-        fi
     fi
 }
 

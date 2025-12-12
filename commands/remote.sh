@@ -57,11 +57,11 @@ then invoke the local ilma backup pipeline on the staged copy.
 LOCAL PATHS (set in the job file):
   stage_dir   Directory on this machine that receives the rsync pull.
               Example: /tmp/ilma-stage/server-user
-  target_dir  Directory on this machine where ilma writes .bak/.context/archives.
+  target_dir  Directory on this machine where ilma writes .bak/archives.
               Example: ~/backups/server/user
 
 OPTIONS:
-  --mode LIST          Override job mode (comma-separated: backup,archive,encrypt,context)
+  --mode LIST          Override job mode (comma-separated: backup,archive,encrypt)
   --target DIR         Override target directory for backup artifacts (--target passthrough)
   --stage-dir DIR      Override local staging directory
   --verify             Force verification after backup
@@ -314,11 +314,11 @@ normalize_mode_list() {
         [[ -z "$trimmed" ]] && continue
         trimmed="$(to_lower "$trimmed")"
         case "$trimmed" in
-            backup|archive|encrypt|context|none)
+            backup|archive|encrypt|none)
                 modes+=("$trimmed")
                 ;;
             *)
-                die "Unsupported mode '$trimmed' (valid: backup, archive, encrypt, context, none)"
+                die "Unsupported mode '$trimmed' (valid: backup, archive, encrypt, none)"
                 ;;
         esac
     done
@@ -409,7 +409,14 @@ remote_pull() {
         modes_raw="$override_mode"
     fi
 
-    mapfile -t resolved_modes < <(normalize_mode_list "$modes_raw")
+    local resolved_modes_raw=()
+    mapfile -t resolved_modes_raw < <(normalize_mode_list "$modes_raw")
+    local resolved_modes=()
+    local rm
+    for rm in "${resolved_modes_raw[@]}"; do
+        [[ "$rm" == "none" ]] && continue
+        resolved_modes+=("$rm")
+    done
 
     local stage_dir
     stage_dir="${override_stage_dir:-$REMOTE_JOB_STAGE_DIR}"
@@ -505,18 +512,7 @@ remote_pull() {
         echo "mode=${resolved_modes[*]}"
     } > "$meta_file"
 
-    local run_backup="false"
-    local op
-    for op in "${resolved_modes[@]}"; do
-        case "$op" in
-            backup|archive|encrypt|context)
-                run_backup="true"
-                break
-                ;;
-        esac
-    done
-
-    if [[ "$run_backup" == "false" ]]; then
+    if [[ "${#resolved_modes[@]}" -eq 0 ]]; then
         echo "No backup operations requested by mode; staging complete."
         return
     fi
@@ -541,7 +537,6 @@ remote_pull() {
             backup) backup_cmd+=(--backup) ;;
             archive) backup_cmd+=(--archive) ;;
             encrypt) backup_cmd+=(--encrypt) ;;
-            context) backup_cmd+=(--context) ;;
             none) ;; # skip
         esac
     done
