@@ -463,6 +463,12 @@ if [[ -z "$PROJECT_ROOT" ]]; then
     PROJECT_ROOT="$(pwd)"
 fi
 
+# Safety guard against dangerous project paths
+if [[ "$PROJECT_ROOT" == "/" || ! -d "$PROJECT_ROOT" ]]; then
+    echo "Error: Invalid project path '$PROJECT_ROOT'" >&2
+    exit 1
+fi
+
 # Handle --timestamp flag before file/directory processing
 if [[ "$TIMESTAMP_FLAG" == "true" ]]; then
     if [[ ! -f "$PROJECT_ROOT" ]]; then

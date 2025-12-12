@@ -71,6 +71,10 @@ resolve_backup_dir_with_deduplication() {
 # Main backup function
 do_backup() {
     local project_root="$1"
+    if [[ -z "$project_root" || "$project_root" == "/" || ! -d "$project_root" ]]; then
+        echo "Error: Invalid project path '$project_root'" >&2
+        return 1
+    fi
     local project_name
     project_name="$(basename "$project_root")"
 
