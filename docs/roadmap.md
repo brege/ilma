@@ -33,10 +33,6 @@
    path=/srv/archives
    verify=sha256
    cleanup_after=true
-
-   [context]
-   extensions=md,py,txt
-   include=AGENTS.md
    ```
    
    Flow  
@@ -51,8 +47,7 @@
    
    - [ ] Domain‑specific keys the tool translates internally.  
      - `EXCLUDE_DIRS=(node_modules dist build __pycache__ venv)`  
-     - `EXCLUDE_GLOBS=('*.log' '*.tmp')`  
-     - `CONTEXT_INCLUDE=('AGENTS.md' 'docs/*.md')`
+     - `EXCLUDE_GLOBS=('*.log' '*.tmp')`
 
    This is something that would be wiser to do now, than painfully make compatible later.
 
@@ -66,8 +61,8 @@
    - [ ] Optional JSON output for machine ingestion (CI/cron).  
 
 5. [**easy**] **Flag Commutativity and Multi-type Merging**  
-   - [ ] Centralize post-operation logic so `-r|--remote` commutes with `-a/-e/-b/-c`.  
-   - [ ] Consider merging multiple `--type` presets (backup + context).  
+   - [ ] Centralize post-operation logic so `-r|--remote` commutes with `-a/-e/-b`.  
+   - [ ] Consider merging multiple `--type` presets.
 
 6. [**easy**] **Platform Support and Fallbacks**  
    Provide shims for portability across Linux/BSD/macOS:  
@@ -129,5 +124,4 @@ This might not be something that needs to be entirely implemented now, just that
      ssh server 'cd /home/user/landing && \
        cat Fedora-12-i386-netinst.iso.part* | sha256sum -'
      ```
-
 

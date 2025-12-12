@@ -2,8 +2,8 @@
 # commands/validate_modular.sh - Modular validation orchestrator
 
 set -euo pipefail
-source "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/_template.sh"
-template_initialize_paths
+source "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/init.sh"
+initialize_paths
 
 # Colors
 RED='\033[0;31m'
@@ -117,7 +117,7 @@ format_output() {
 
 validate_main() {
     parse_validate_arguments "$@"
-    PROJECT_ROOT="$(template_require_project_root "$PROJECT_ROOT")"
+    PROJECT_ROOT="$(require_project_root "$PROJECT_ROOT")"
 
     if [[ -f "$PROJECT_ROOT/.ilma.conf" ]]; then
         source "$PROJECT_ROOT/.ilma.conf" 2>/dev/null || true
@@ -174,5 +174,5 @@ validate_main() {
 }
 
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-    template_dispatch usage validate_main "$@"
+    dispatch usage validate_main "$@"
 fi

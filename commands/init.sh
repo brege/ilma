@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-template_initialize_paths() {
+initialize_paths() {
     if [[ -n "${ILMA_DIR:-}" ]]; then
         return
     fi
@@ -14,7 +14,7 @@ template_initialize_paths() {
     ILMA_DIR="$(dirname "$commands_directory")"
 }
 
-template_command_name() {
+command_name() {
     local caller_source="${BASH_SOURCE[1]:-${BASH_SOURCE[0]}}"
     local caller_path
     caller_path="$(readlink -f "$caller_source")"
@@ -23,7 +23,7 @@ template_command_name() {
     echo "${caller_file%.sh}"
 }
 
-template_require_project_root() {
+require_project_root() {
     local path_argument="${1:-}"
 
     if [[ -z "$path_argument" ]]; then
@@ -44,7 +44,7 @@ template_require_project_root() {
     echo "$resolved_path"
 }
 
-template_dispatch() {
+dispatch() {
     local usage_function="$1"
     local main_function="$2"
     shift 2

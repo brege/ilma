@@ -1,8 +1,8 @@
 #!/bin/bash
 set -euo pipefail
 
-source "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/_template.sh"
-template_initialize_paths
+source "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/init.sh"
+initialize_paths
 
 source "$ILMA_DIR/lib/configs.sh"
 
@@ -278,11 +278,11 @@ parse_config_arguments() {
 config_main() {
     parse_config_arguments "$@"
     local project_root
-    project_root="$(template_require_project_root "$project_path")"
+    project_root="$(require_project_root "$project_path")"
     load_config "$project_root" "$type_name"
     show_config "$project_root"
 }
 
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-    template_dispatch usage config_main "$@"
+    dispatch usage config_main "$@"
 fi

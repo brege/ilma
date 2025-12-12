@@ -3,8 +3,8 @@
 
 set -euo pipefail
 
-source "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/_template.sh"
-template_initialize_paths
+source "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/init.sh"
+initialize_paths
 
 source "$ILMA_DIR/lib/configs.sh"
 
@@ -25,22 +25,13 @@ usage() {
     cat <<EOF
 Usage: ilma scan [--type TYPE] [--pretty] [directory]
 
-  --type TYPE     Project type to use (required if no local .ilma.conf)
-                  Supported types: ${!types_map[*]} all
-                  Multiple types: --type node --type python OR --type 'node|python'
-  --pretty        Human-friendly output with colors and headers
-  directory       Directory to scan for projects (default: current dir)
+  --type TYPE     Project type (required if no local .ilma.conf). 
+                  Supported: 
+                    ${!types_map[*]} all
+  --pretty        Human-friendly output
+  directory       Directory to scan (default: current dir)
 
-This tool scans directories for projects and outputs junk file paths
-according to the selected TYPE's exclude patterns or local .ilma.conf.
-
-Use --type all to scan with all available \$project.ilma.conf configs.
-Use multiple --type flags or pipe-separated values for combined patterns.
-
-Default: machine-readable paths only (safe for piping)
-With --pretty: human-friendly display with project context
-
-Dry run mode only: no files are deleted.
+Outputs junk file paths based on the selected type or local .ilma.conf.
 EOF
     exit 1
 }
@@ -112,7 +103,7 @@ scan_main() {
     initialize_types_map
     parse_scan_arguments "$@"
 
-    DIR="$(template_require_project_root "$DIR")"
+    DIR="$(require_project_root "$DIR")"
 
     CONFIG_FILE=""
     RSYNC_EXCLUDES=()

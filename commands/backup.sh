@@ -1,8 +1,8 @@
 #!/bin/bash
 set -euo pipefail
 
-source "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/_template.sh"
-template_initialize_paths
+source "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/init.sh"
+initialize_paths
 
 source "$ILMA_DIR/lib/functions.sh"
 source "$ILMA_DIR/lib/deps/compression.sh"
@@ -319,7 +319,7 @@ backup_main() {
 
     local project_input="${positional_arguments[0]:-}"
     local project_root
-    project_root="$(template_require_project_root "$project_input")"
+    project_root="$(require_project_root "$project_input")"
 
     handle_timestamp_mode "$project_root"
 
@@ -585,5 +585,5 @@ backup_main() {
 }
 
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-    template_dispatch backup_usage backup_main "$@"
+    dispatch backup_usage backup_main "$@"
 fi

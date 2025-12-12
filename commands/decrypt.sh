@@ -1,8 +1,8 @@
 #!/bin/bash
 set -euo pipefail
 
-source "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/_template.sh"
-template_initialize_paths
+source "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/init.sh"
+initialize_paths
 
 source "$ILMA_DIR/lib/deps/gpg.sh"
 source "$ILMA_DIR/lib/extract.sh"
@@ -194,5 +194,5 @@ decrypt_main() {
 }
 
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-    template_dispatch decrypt_usage decrypt_main "$@"
+    dispatch decrypt_usage decrypt_main "$@"
 fi

@@ -3,8 +3,8 @@
 
 set -euo pipefail
 
-source "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/_template.sh"
-template_initialize_paths
+source "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/init.sh"
+initialize_paths
 
 source "$ILMA_DIR/lib/configs.sh"
 source "$ILMA_DIR/lib/functions.sh"
@@ -720,5 +720,5 @@ list_remote_jobs() {
 }
 
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-    template_dispatch remote_usage remote_main "$@"
+    dispatch remote_usage remote_main "$@"
 fi

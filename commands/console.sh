@@ -1,8 +1,8 @@
 #!/bin/bash
 set -euo pipefail
 
-source "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/_template.sh"
-template_initialize_paths
+source "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/init.sh"
+initialize_paths
 
 source "$ILMA_DIR/lib/functions.sh"
 source "$ILMA_DIR/commands/config.sh"
@@ -47,7 +47,7 @@ EOF
 console_main() {
     local project_path="${1:-$(pwd)}"
     local project_root
-    project_root="$(template_require_project_root "$project_path")"
+    project_root="$(require_project_root "$project_path")"
 
     load_config "$project_root"
     show_console_summary "$project_root"
