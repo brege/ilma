@@ -2,7 +2,8 @@
 # commands/validate_modular.sh - Modular validation orchestrator
 
 set -euo pipefail
-ILMA_DIR="$(dirname "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")")"
+source "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/_template.sh"
+template_initialize_paths
 
 # Colors
 RED='\033[0;31m'
@@ -35,6 +36,34 @@ Examples:
   ilma validate --dependencies     # Check system dependencies only
   ilma validate --gpg              # Check GPG setup only
 EOF
+}
+
+parse_validate_arguments() {
+    VALIDATION_MODE="basic"
+    PROJECT_ROOT="$(pwd)"
+
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --dependencies) VALIDATION_MODE="dependencies"; shift ;;
+            --gpg) VALIDATION_MODE="gpg"; shift ;;
+            --compression) VALIDATION_MODE="compression"; shift ;;
+            --config) VALIDATION_MODE="config"; shift ;;
+            --paths) VALIDATION_MODE="paths"; shift ;;
+            --remote) VALIDATION_MODE="remote"; shift ;;
+            --basic) VALIDATION_MODE="basic"; shift ;;
+            --full) VALIDATION_MODE="full"; shift ;;
+            -h|--help) usage; exit 0 ;;
+            -*)
+                echo "Error: Unknown option $1" >&2
+                usage >&2
+                exit 1
+                ;;
+            *)
+                PROJECT_ROOT="$1"
+                shift
+                ;;
+        esac
+    done
 }
 
 format_output() {
@@ -86,76 +115,64 @@ format_output() {
     done
 }
 
-# Parse arguments
-VALIDATION_MODE="basic"
-PROJECT_ROOT="$(pwd)"
+validate_main() {
+    parse_validate_arguments "$@"
+    PROJECT_ROOT="$(template_require_project_root "$PROJECT_ROOT")"
 
-while [[ $# -gt 0 ]]; do
-    case $1 in
-        --dependencies) VALIDATION_MODE="dependencies"; shift ;;
-        --gpg) VALIDATION_MODE="gpg"; shift ;;
-        --compression) VALIDATION_MODE="compression"; shift ;;
-        --config) VALIDATION_MODE="config"; shift ;;
-        --paths) VALIDATION_MODE="paths"; shift ;;
-        --remote) VALIDATION_MODE="remote"; shift ;;
-        --basic) VALIDATION_MODE="basic"; shift ;;
-        --full) VALIDATION_MODE="full"; shift ;;
-        -h|--help) usage; exit 0 ;;
-        -*) echo "Error: Unknown option $1" >&2; usage >&2; exit 1 ;;
-        *) PROJECT_ROOT="$1"; shift ;;
+    if [[ -f "$PROJECT_ROOT/.ilma.conf" ]]; then
+        source "$PROJECT_ROOT/.ilma.conf" 2>/dev/null || true
+    fi
+
+    case "$VALIDATION_MODE" in
+        dependencies)
+            "$ILMA_DIR/lib/validation/dependencies.sh" | format_output
+            ;;
+        gpg)
+            GPG_KEY_ID="${GPG_KEY_ID:-}" "$ILMA_DIR/lib/validation/gpg.sh" | format_output
+            ;;
+        compression)
+            COMPRESSION_TYPE="${COMPRESSION_TYPE:-}" "$ILMA_DIR/lib/validation/compression.sh" | format_output
+            ;;
+        config)
+            "$ILMA_DIR/lib/validation/config.sh" "$PROJECT_ROOT" | format_output
+            ;;
+        paths)
+            "$ILMA_DIR/lib/validation/paths.sh" "$PROJECT_ROOT" | format_output
+            ;;
+        remote)
+            "$ILMA_DIR/lib/validation/remote.sh" "$PROJECT_ROOT" | format_output
+            "$ILMA_DIR/lib/validation/manifests.sh" | format_output
+            ;;
+        basic)
+            echo -e "${BLUE}ilma Configuration Validator${RESET}"
+            echo "Project: $PROJECT_ROOT"
+            echo "Validation level: basic"
+
+            "$ILMA_DIR/lib/validation/config.sh" "$PROJECT_ROOT" | format_output
+            "$ILMA_DIR/lib/validation/paths.sh" "$PROJECT_ROOT" | format_output
+            COMPRESSION_TYPE="${COMPRESSION_TYPE:-}" "$ILMA_DIR/lib/validation/compression.sh" | format_output
+            GPG_KEY_ID="${GPG_KEY_ID:-}" "$ILMA_DIR/lib/validation/gpg.sh" | format_output
+            ;;
+        full)
+            echo -e "${BLUE}ilma Configuration Validator${RESET}"
+            echo "Project: $PROJECT_ROOT"
+            echo "Validation level: full"
+
+            "$ILMA_DIR/lib/validation/config.sh" "$PROJECT_ROOT" | format_output
+            "$ILMA_DIR/lib/validation/paths.sh" "$PROJECT_ROOT" | format_output
+            COMPRESSION_TYPE="${COMPRESSION_TYPE:-}" "$ILMA_DIR/lib/validation/compression.sh" | format_output
+            GPG_KEY_ID="${GPG_KEY_ID:-}" "$ILMA_DIR/lib/validation/gpg.sh" | format_output
+            "$ILMA_DIR/lib/validation/remote.sh" "$PROJECT_ROOT" | format_output
+            "$ILMA_DIR/lib/validation/manifests.sh" | format_output
+            "$ILMA_DIR/lib/validation/dependencies.sh" | format_output
+            ;;
+        *)
+            echo "Error: Unknown validation mode '$VALIDATION_MODE'" >&2
+            exit 1
+            ;;
     esac
-done
+}
 
-# Load config for GPG_KEY_ID and COMPRESSION_TYPE
-if [[ -f "$PROJECT_ROOT/.ilma.conf" ]]; then
-    source "$PROJECT_ROOT/.ilma.conf" 2>/dev/null || true
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    template_dispatch usage validate_main "$@"
 fi
-
-case "$VALIDATION_MODE" in
-    dependencies)
-        "$ILMA_DIR/lib/validation/dependencies.sh" | format_output
-        ;;
-    gpg)
-        GPG_KEY_ID="${GPG_KEY_ID:-}" "$ILMA_DIR/lib/validation/gpg.sh" | format_output
-        ;;
-    compression)
-        COMPRESSION_TYPE="${COMPRESSION_TYPE:-}" "$ILMA_DIR/lib/validation/compression.sh" | format_output
-        ;;
-    config)
-        "$ILMA_DIR/lib/validation/config.sh" "$PROJECT_ROOT" | format_output
-        ;;
-    paths)
-        "$ILMA_DIR/lib/validation/paths.sh" "$PROJECT_ROOT" | format_output
-        ;;
-    remote)
-        "$ILMA_DIR/lib/validation/remote.sh" "$PROJECT_ROOT" | format_output
-        "$ILMA_DIR/lib/validation/manifests.sh" | format_output
-        ;;
-    basic)
-        echo -e "${BLUE}ilma Configuration Validator${RESET}"
-        echo "Project: $PROJECT_ROOT"
-        echo "Validation level: basic"
-
-        "$ILMA_DIR/lib/validation/config.sh" "$PROJECT_ROOT" | format_output
-        "$ILMA_DIR/lib/validation/paths.sh" "$PROJECT_ROOT" | format_output
-        COMPRESSION_TYPE="${COMPRESSION_TYPE:-}" "$ILMA_DIR/lib/validation/compression.sh" | format_output
-        GPG_KEY_ID="${GPG_KEY_ID:-}" "$ILMA_DIR/lib/validation/gpg.sh" | format_output
-        ;;
-    full)
-        echo -e "${BLUE}ilma Configuration Validator${RESET}"
-        echo "Project: $PROJECT_ROOT"
-        echo "Validation level: full"
-
-        "$ILMA_DIR/lib/validation/config.sh" "$PROJECT_ROOT" | format_output
-        "$ILMA_DIR/lib/validation/paths.sh" "$PROJECT_ROOT" | format_output
-        COMPRESSION_TYPE="${COMPRESSION_TYPE:-}" "$ILMA_DIR/lib/validation/compression.sh" | format_output
-        GPG_KEY_ID="${GPG_KEY_ID:-}" "$ILMA_DIR/lib/validation/gpg.sh" | format_output
-        "$ILMA_DIR/lib/validation/remote.sh" "$PROJECT_ROOT" | format_output
-        "$ILMA_DIR/lib/validation/manifests.sh" | format_output
-        "$ILMA_DIR/lib/validation/dependencies.sh" | format_output
-        ;;
-    *)
-        echo "Error: Unknown validation mode '$VALIDATION_MODE'" >&2
-        exit 1
-        ;;
-esac

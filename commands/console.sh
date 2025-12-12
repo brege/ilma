@@ -1,9 +1,11 @@
 #!/bin/bash
-# commands/console.sh - Console summary and analysis functionality for ilma
+set -euo pipefail
 
-# Source required functions
-ILMA_DIR="$(dirname "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")")"
+source "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/_template.sh"
+template_initialize_paths
+
 source "$ILMA_DIR/lib/functions.sh"
+source "$ILMA_DIR/commands/config.sh"
 
 usage() {
     cat <<EOF
@@ -40,6 +42,15 @@ NOTES:
 
 EOF
     exit 0
+}
+
+console_main() {
+    local project_path="${1:-$(pwd)}"
+    local project_root
+    project_root="$(template_require_project_root "$project_path")"
+
+    load_config "$project_root"
+    show_console_summary "$project_root"
 }
 
 # Show console summary (stats only, no backup)
@@ -269,6 +280,13 @@ show_backup_stats() {
         show_console_summary "$project_root"
     fi
 }
+
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
+        usage
+    fi
+    console_main "$@"
+fi
 
 # If called directly as a command
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then

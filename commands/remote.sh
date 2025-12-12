@@ -3,7 +3,9 @@
 
 set -euo pipefail
 
-ILMA_DIR="$(dirname "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")")"
+source "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/_template.sh"
+template_initialize_paths
+
 source "$ILMA_DIR/lib/configs.sh"
 source "$ILMA_DIR/lib/functions.sh"
 
@@ -663,11 +665,12 @@ remote_main() {
         exit 1
     fi
 
-    shift  # Drop the literal 'remote'
-
-    if [[ $# -eq 0 ]]; then
-        remote_usage
-        exit 1
+    if [[ "$1" == "remote" ]]; then
+        shift
+        if [[ $# -eq 0 ]]; then
+            remote_usage
+            exit 1
+        fi
     fi
 
     local subcommand="$1"
@@ -675,6 +678,10 @@ remote_main() {
 
     case "$subcommand" in
         pull)
+            if [[ $# -eq 0 ]]; then
+                remote_usage
+                exit 1
+            fi
             pull_alias_main remote pull "$@"
             ;;
         list)
@@ -716,3 +723,7 @@ list_remote_jobs() {
         done < <(find "$dir" -type f -name '*.ini' -print0 | sort -z)
     done
 }
+
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    template_dispatch remote_usage remote_main "$@"
+fi

@@ -1,8 +1,14 @@
 #!/bin/bash
-# commands/config.sh - Configuration loading and management for ilma
+set -euo pipefail
 
-ILMA_DIR="$(dirname "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")")"
+source "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/_template.sh"
+template_initialize_paths
+
+ILMA_DIR="${ILMA_DIR}"
 source "$ILMA_DIR/lib/configs.sh"
+
+type_name=""
+project_path=""
 
 # Load INI configuration file
 load_ini_config() {
@@ -209,15 +215,21 @@ show_config() {
     echo "Config found: ${CONFIG_FOUND}"
     echo
     if [[ "$CONFIG_FOUND" == "true" ]]; then
+        local backup_display
+        if [[ -n "$BACKUP_BASE_DIR" ]]; then
+            backup_display="$(realpath -m "${BACKUP_BASE_DIR/#\~/$HOME}")"
+        else
+            backup_display="(not set)"
+        fi
         echo "Resolved paths:"
-        echo "  BACKUP_BASE_DIR   = $(realpath "${BACKUP_BASE_DIR/#\~/$HOME}")"
+        echo "  BACKUP_BASE_DIR   = $backup_display"
         if [[ -n "$ARCHIVE_BASE_DIR" ]]; then
-            echo "  ARCHIVE_BASE_DIR  = $(realpath "${ARCHIVE_BASE_DIR/#\~/$HOME}")"
+            echo "  ARCHIVE_BASE_DIR  = $(realpath -m "${ARCHIVE_BASE_DIR/#\~/$HOME}")"
         else
             echo "  ARCHIVE_BASE_DIR  = (not set)"
         fi
         if [[ -n "$CONTEXT_BASE_DIR" ]]; then
-            echo "  CONTEXT_BASE_DIR  = $(realpath "${CONTEXT_BASE_DIR/#\~/$HOME}")"
+            echo "  CONTEXT_BASE_DIR  = $(realpath -m "${CONTEXT_BASE_DIR/#\~/$HOME}")"
         else
             echo "  CONTEXT_BASE_DIR  = (nested in backup)"
         fi
@@ -231,37 +243,65 @@ show_config() {
         echo "  BACKUP_XDG_DIRS          = $BACKUP_XDG_DIRS"
         echo "  EXTENSIONS               = (${EXTENSIONS[*]})"
     else
+        local fallback_archive_dir
+        if [[ -n "$ARCHIVE_BASE_DIR" ]]; then
+            fallback_archive_dir="$(realpath -m "${ARCHIVE_BASE_DIR/#\~/$HOME}")"
+        else
+            fallback_archive_dir="$(dirname "$project_root")"
+        fi
         echo "Fallback mode - no configuration file found."
-        echo "  ARCHIVE_BASE_DIR = $(realpath "${ARCHIVE_BASE_DIR/#\~/$HOME}")"
+        echo "  ARCHIVE_BASE_DIR = $fallback_archive_dir"
     fi
 }
 
-# If called directly as a command
-if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-    # Handle help flag
-    if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
-        cat << 'EOF'
-Usage: config.sh [PROJECT_PATH] [TYPE]
+parse_config_arguments() {
+    type_name=""
+    project_path=""
 
-Standalone configuration tool - loads and displays project configuration.
+    while (( $# > 0 )); do
+        case "$1" in
+            --type)
+                if [[ -z "${2:-}" ]]; then
+                    echo "Error: --type requires an argument" >&2
+                    exit 1
+                fi
+                type_name="$2"
+                shift 2
+                ;;
+            -h|--help)
+                usage
+                ;;
+            --*)
+                echo "Error: Unknown option '$1'" >&2
+                exit 1
+                ;;
+            *)
+                if [[ -z "$project_path" ]]; then
+                    project_path="$1"
+                elif [[ -z "$type_name" ]]; then
+                    type_name="${type_name:-$1}"
+                else
+                    echo "Error: Too many positional arguments" >&2
+                    exit 1
+                fi
+                shift
+                ;;
+        esac
+    done
 
-Arguments:
-  PROJECT_PATH    Path to project directory (default: current directory)
-  TYPE            Project type for --type flag simulation
-
-Examples:
-  ./commands/config.sh /path/to/project
-  ./commands/config.sh . python
-  ./commands/config.sh /path/to/project bash
-
-Shows resolved configuration including PROJECT_TYPE inheritance and all settings.
-EOF
-        exit 0
+    if [[ -z "$project_path" ]]; then
+        project_path="$(pwd)"
     fi
+}
 
-    PROJECT_ROOT="${1:-$(pwd)}"
-    TYPE="${2:-}"
+config_main() {
+    parse_config_arguments "$@"
+    local project_root
+    project_root="$(template_require_project_root "$project_path")"
+    load_config "$project_root" "$type_name"
+    show_config "$project_root"
+}
 
-    load_config "$PROJECT_ROOT" "$TYPE"
-    show_config "$PROJECT_ROOT"
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    template_dispatch usage config_main "$@"
 fi

@@ -1,7 +1,13 @@
 #!/bin/bash
-# commands/prune.sh - Simple prune functionality using scan.sh
+set -euo pipefail
 
-ILMA_DIR="$(dirname "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")")"
+source "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/_template.sh"
+template_initialize_paths
+
+source "$ILMA_DIR/commands/config.sh"
+source "$ILMA_DIR/lib/deps/compression.sh"
+source "$ILMA_DIR/commands/console.sh"
+source "$ILMA_DIR/lib/log.sh"
 
 # Find files by pattern (overrides config-based scanning)
 find_by_pattern() {
@@ -65,10 +71,83 @@ EOF
     exit 0
 }
 
+type_name=""
+pattern_override=""
+verbose_option=false
+backup_option=false
+delete_option=false
+project_path=""
+
+parse_prune_arguments() {
+    type_name=""
+    pattern_override=""
+    verbose_option=false
+    backup_option=false
+    delete_option=false
+    project_path=""
+
+    while (( $# > 0 )); do
+        case "$1" in
+            --type)
+                if [[ -z "${2:-}" ]]; then
+                    echo "Error: --type requires an argument" >&2
+                    exit 1
+                fi
+                if [[ -n "$type_name" ]]; then
+                    type_name="${type_name}|${2}"
+                else
+                    type_name="$2"
+                fi
+                shift 2
+                ;;
+            --pattern)
+                if [[ -z "${2:-}" ]]; then
+                    echo "Error: --pattern requires an argument" >&2
+                    exit 1
+                fi
+                pattern_override="$2"
+                shift 2
+                ;;
+            --verbose)
+                verbose_option=true
+                shift
+                ;;
+            --bak)
+                backup_option=true
+                shift
+                ;;
+            --delete)
+                delete_option=true
+                shift
+                ;;
+            -h|--help)
+                usage
+                ;;
+            --*)
+                echo "Error: Unknown option '$1'" >&2
+                exit 1
+                ;;
+            *)
+                if [[ -z "$project_path" ]]; then
+                    project_path="$1"
+                else
+                    echo "Error: Too many positional arguments" >&2
+                    exit 1
+                fi
+                shift
+                ;;
+        esac
+    done
+
+    if [[ -z "$project_path" ]]; then
+        project_path="$(pwd)"
+    fi
+}
+
 do_prune() {
     local project_root="$1"
     local verbose="${2:-false}"
-    local type="${3:-$TYPE}"
+    local type="${3:-${TYPE-}}"
     local delete_mode="${4:-false}"
     local pattern="${5:-}"
     local project_name
@@ -128,6 +207,7 @@ do_prune() {
 
         log_summary "$log_file" "Prune operation completed: $deleted deleted, $failed failed"
         echo "Operation logged to: $log_file"
+        set -e
     elif [[ "$verbose" == "true" ]]; then
         # Verbose dry-run: show detailed analysis with individual paths
         echo "Verbose analysis - showing all prunable paths:"
@@ -194,3 +274,75 @@ do_prune() {
         echo "Use --delete to remove these files"
     fi
 }
+
+prune_main() {
+    parse_prune_arguments "$@"
+
+    local project_root
+    project_root="$(template_require_project_root "$project_path")"
+    load_config "$project_root" "$type_name"
+
+    if [[ "$backup_option" == "true" ]]; then
+        handle_special_modes "" "$project_root"
+    fi
+
+    local delete_mode="false"
+    if [[ "$backup_option" == "true" || "$delete_option" == "true" ]]; then
+        delete_mode="true"
+    fi
+
+    local project_name
+    project_name="$(basename "$project_root")"
+
+    if [[ "$backup_option" == "true" ]]; then
+        echo "Creating complete backup before deletion..."
+        local parent_directory
+        parent_directory="$(dirname "$project_root")"
+        local archive_extension
+        archive_extension="$(get_archive_extension "$COMPRESSION_TYPE")"
+        local backup_archive
+        backup_archive="$parent_directory/${project_name}.orig${archive_extension}"
+
+        local tar_option
+        tar_option="$(get_tar_option "$COMPRESSION_TYPE")"
+        local tar_command
+        if [[ -n "$tar_option" ]]; then
+            tar_command=("tar" "$tar_option" "-cf")
+        else
+            tar_command=("tar" "-cf")
+        fi
+
+        if "${tar_command[@]}" "$backup_archive" -C "$project_root" .; then
+            echo "Complete backup created: $backup_archive"
+        else
+            echo "ERROR: Failed to create backup archive" >&2
+            exit 1
+        fi
+        echo
+        echo "Backup complete. Now proceeding with junk file deletion..."
+        echo
+    fi
+
+    local verbose_flag="false"
+    if [[ "$verbose_option" == "true" ]]; then
+        verbose_flag="true"
+    fi
+
+    do_prune "$project_root" "$verbose_flag" "$type_name" "$delete_mode" "$pattern_override"
+
+    if [[ "$backup_option" == "true" && "$CONFIG_FOUND" == "true" ]]; then
+        echo
+        local mirror_directory
+        if [[ -n "$CONTEXT_BASE_DIR" ]]; then
+            mirror_directory="$CONTEXT_BASE_DIR/$project_name"
+        else
+            MAIN_BACKUP_DIR="$BACKUP_BASE_DIR/${project_name}.bak"
+            mirror_directory="$MAIN_BACKUP_DIR/$project_name"
+        fi
+        show_backup_stats "$project_root" "$mirror_directory"
+    fi
+}
+
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    template_dispatch usage prune_main "$@"
+fi
