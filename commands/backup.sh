@@ -1,14 +1,67 @@
 #!/bin/bash
-# commands/backup.sh - Main backup functionality for ilma
+set -euo pipefail
 
-# Source required functions
-ILMA_DIR="$(dirname "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")")"
+source "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/_template.sh"
+template_initialize_paths
+
 source "$ILMA_DIR/lib/functions.sh"
 source "$ILMA_DIR/lib/deps/compression.sh"
 source "$ILMA_DIR/lib/deps/rsync.sh"
 source "$ILMA_DIR/lib/deps/gpg.sh"
+source "$ILMA_DIR/commands/config.sh"
+source "$ILMA_DIR/lib/backup/archive.sh"
+source "$ILMA_DIR/lib/backup/context.sh"
+source "$ILMA_DIR/lib/backup/encrypt.sh"
+source "$ILMA_DIR/lib/backup/remote.sh"
+source "$ILMA_DIR/lib/singles.sh"
+source "$ILMA_DIR/lib/validation/verify.sh"
+source "$ILMA_DIR/commands/console.sh"
 
-# Path resolution for *_base_dir settings
+backup_requested=false
+backup_output=""
+archive_requested=false
+archive_output=""
+encrypt_requested=false
+encrypt_output=""
+context_requested=false
+context_output=""
+remote_target=""
+type_name=""
+target_directory=""
+custom_basename=""
+verify_option=""
+timestamp_mode=false
+config_only=false
+positional_arguments=()
+
+backup_usage() {
+    cat <<'EOF'
+Usage: backup.sh [OPTIONS] [PROJECT_PATH] [ADDITIONAL_PATHS...]
+
+Create backup and context mirror for a project, or produce archives and encrypted archives.
+
+OPTIONS:
+  -b, --backup [OUTPUT_PATH]     Create backup directory (explicit)
+  -a, --archive [OUTPUT_PATH]    Create compressed archive only
+  -e, --encrypt [OUTPUT_PATH]    Create encrypted archive only
+  -c, --context [OUTPUT_PATH]    Create context mirror only
+  -r, --remote SERVER:/PATH      Sync directly to remote server
+  --type TYPE                    Project type configuration
+  --target DIR                   Output directory for generated artifacts
+  --basename NAME                Custom base filename for archives
+  --verify                       Verify outputs (archives or mirrors)
+  --timestamp                    Append timestamp to archive filename
+  --config                       Show resolved configuration and exit
+  -h, --help                     Show this help message
+
+ARGUMENTS:
+  PROJECT_PATH                   Project directory or file (default: current directory)
+  ADDITIONAL_PATHS               Extra roots for multi-origin archive/encrypt
+
+Default behavior runs a full backup with context mirror when no operation flags are provided.
+EOF
+}
+
 resolve_base_dir() {
     local base_dir="$1"
     local project_root="$2"
@@ -16,26 +69,20 @@ resolve_base_dir() {
     local suffix="$4"
 
     if [[ -z "$base_dir" || "$base_dir" == ".." ]]; then
-        # Default: sibling to project
         echo "$(dirname "$project_root")/${project_name}${suffix}"
     elif [[ "$base_dir" == "." ]]; then
-        # Inside target directory
         echo "$project_root/${project_name}${suffix}"
     elif [[ "$base_dir" == /* ]]; then
-        # Absolute path
         echo "${base_dir/#\~/$HOME}/${project_name}${suffix}"
     else
-        # Relative path - relative to project directory
         echo "$project_root/$base_dir/${project_name}${suffix}"
     fi
 }
 
-# Generate unique backup directory name with timestamp/numbering
 resolve_backup_dir_with_deduplication() {
     local base_path="$1"
     local naming_strategy="${VERSIONING:-timestamp}"
 
-    # If directory doesn't exist, use it as-is
     if [[ ! -d "$base_path" ]]; then
         echo "$base_path"
         return
@@ -60,7 +107,6 @@ resolve_backup_dir_with_deduplication() {
             echo "$base_path"
             ;;
         *)
-            # Default to timestamp
             local timestamp
             timestamp="$(date '+%Y%m%d-%H%M%S')"
             echo "${base_path%.bak}-${timestamp}.bak"
@@ -68,7 +114,6 @@ resolve_backup_dir_with_deduplication() {
     esac
 }
 
-# Main backup function
 do_backup() {
     local project_root="$1"
     if [[ -z "$project_root" || "$project_root" == "/" || ! -d "$project_root" ]]; then
@@ -81,63 +126,52 @@ do_backup() {
     echo "Backing up project: $project_name"
     echo "Source: $project_root"
 
-    # Configuration should be loaded before calling this function
-    # Variables expected: BACKUP_BASE_DIR, CONFIG_FOUND, etc.
-
-    # Resolve backup directory path with deduplication
     local base_backup_path
     base_backup_path=$(resolve_base_dir "$BACKUP_BASE_DIR" "$project_root" "$project_name" ".bak")
     MAIN_BACKUP_DIR=$(resolve_backup_dir_with_deduplication "$base_backup_path")
 
-    # Set context mirror location
     if [[ -n "$CONTEXT_BASE_DIR" ]]; then
         MIRROR_DIR=$(resolve_base_dir "$CONTEXT_BASE_DIR" "$project_root" "$project_name" ".context")
         MIRROR_DIR_BASENAME="$(basename "$MIRROR_DIR")"
     else
-        # Default: sibling to project (not inside .bak)
         MIRROR_DIR_BASENAME="${project_name}.context"
         MIRROR_DIR="$(dirname "$project_root")/$MIRROR_DIR_BASENAME"
     fi
 
-    # Always create backup directory
-    {
-        # --- Step 1: Main Full Backup ---
-        echo "Step 1: Creating main full backup at '$MAIN_BACKUP_DIR'..."
-        mkdir -p "$MAIN_BACKUP_DIR"
-        # Exclude backup directory itself to prevent recursion
-        BACKUP_EXCLUDES=(--exclude "$MIRROR_DIR_BASENAME/")
+    echo "Step 1: Creating main full backup at '$MAIN_BACKUP_DIR'..."
+    mkdir -p "$MAIN_BACKUP_DIR"
+    BACKUP_EXCLUDES=(--exclude "$MIRROR_DIR_BASENAME/")
 
-        # Check if backup directory is inside project directory
-        if [[ "$MAIN_BACKUP_DIR" == "$project_root"/* ]]; then
-            backup_basename="$(basename "$MAIN_BACKUP_DIR")"
-            BACKUP_EXCLUDES+=(--exclude "$backup_basename/")
-        fi
-        local -a backup_rsync_args=()
-        ilma_append_rsync_preserve_args backup_rsync_args
-        backup_rsync_args+=(--delete --delete-delay --info=progress2)
-        smart_copy "$project_root" "$MAIN_BACKUP_DIR" "${backup_rsync_args[@]}" "${BACKUP_EXCLUDES[@]}"
-        echo "Main backup complete."
-    }
+    if [[ "$MAIN_BACKUP_DIR" == "$project_root"/* ]]; then
+        local backup_basename
+        backup_basename="$(basename "$MAIN_BACKUP_DIR")"
+        BACKUP_EXCLUDES+=(--exclude "$backup_basename/")
+    fi
+    local -a backup_rsync_args=()
+    ilma_append_rsync_preserve_args backup_rsync_args
+    backup_rsync_args+=(--delete --delete-delay --info=progress2)
+    smart_copy "$project_root" "$MAIN_BACKUP_DIR" "${backup_rsync_args[@]}" "${BACKUP_EXCLUDES[@]}"
+    echo "Main backup complete."
 
-    # Create context mirror when config found or type config loaded
     if [[ "$CONFIG_FOUND" == "true" || "$TYPE_CONFIG_LOADED" == "true" ]]; then
-        # --- Step 1a: Backup XDG directories if enabled ---
         if [[ "$BACKUP_XDG_DIRS" == "true" ]]; then
             echo "Step 1a: Backing up XDG directories..."
             XDG_BACKUP_DIR="$MAIN_BACKUP_DIR/xdg"
             mkdir -p "$XDG_BACKUP_DIR"
 
             for xdg_base in "${XDG_PATHS[@]}"; do
-                # Expand tilde and check if project-specific directory exists
+                local xdg_expanded
                 xdg_expanded="${xdg_base/#\~/$HOME}"
+                local project_xdg_dir
                 project_xdg_dir="$xdg_expanded/$project_name"
 
                 if [[ -d "$project_xdg_dir" ]]; then
                     local -a xdg_rsync_args=()
                     ilma_append_rsync_preserve_args xdg_rsync_args
                     xdg_rsync_args+=(--info=progress2 --partial)
-                    # Create relative path structure in backup
-                    xdg_rel_path="${xdg_base#~/}"  # Remove ~/ prefix
+                    local xdg_rel_path
+                    xdg_rel_path="${xdg_base#~/}"
+                    local backup_dest
                     backup_dest="$XDG_BACKUP_DIR/$xdg_rel_path"
                     mkdir -p "$backup_dest"
 
@@ -150,24 +184,21 @@ do_backup() {
 
         echo
 
-        # --- Step 2: Create Context Mirror ---
         echo "Step 2: Creating context mirror at '$MIRROR_DIR'..."
         mkdir -p "$MIRROR_DIR"
 
-        # Add dynamic exclusions to the configured list
         DYNAMIC_EXCLUDES=(
             --exclude "$(basename "$MAIN_BACKUP_DIR")/"
         )
 
-        # If using separate context directory, exclude it from backup
         if [[ -n "$CONTEXT_BASE_DIR" && "$CONTEXT_BASE_DIR" != "$BACKUP_BASE_DIR" ]]; then
-            CONTEXT_BASE_BASENAME="$(basename "$CONTEXT_BASE_DIR")"
-            if [[ "$project_root" == *"/$CONTEXT_BASE_BASENAME"* || "$project_root" == *"$CONTEXT_BASE_BASENAME" ]]; then
+            local context_base_basename
+            context_base_basename="$(basename "$CONTEXT_BASE_DIR")"
+            if [[ "$project_root" == *"/$context_base_basename"* || "$project_root" == *"$context_base_basename" ]]; then
                 DYNAMIC_EXCLUDES+=(--exclude "$(basename "$CONTEXT_BASE_DIR")/")
             fi
         fi
 
-        # Add .git exclusion only for context mirrors (protection from Claude Code 1000 file limit)
         CONTEXT_EXCLUDES=("--exclude" ".git/")
         FINAL_EXCLUDES=("${RSYNC_EXCLUDES[@]}" "${DYNAMIC_EXCLUDES[@]}" "${CONTEXT_EXCLUDES[@]}")
 
@@ -178,7 +209,6 @@ do_backup() {
         echo "Context mirror created."
         echo
 
-        # --- Step 3: Generate TREE.txt and Copy Context Files into the Mirror ---
         source "$ILMA_DIR/hooks/tree.sh"
         generate_tree_and_context "$project_root" "$project_name" "$MIRROR_DIR"
 
@@ -189,157 +219,497 @@ do_backup() {
     fi
 }
 
+parse_backup_arguments() {
+    backup_requested=false
+    backup_output=""
+    archive_requested=false
+    archive_output=""
+    encrypt_requested=false
+    encrypt_output=""
+    context_requested=false
+    context_output=""
+    remote_target=""
+    type_name=""
+    target_directory=""
+    custom_basename=""
+    verify_option=""
+    timestamp_mode=false
+    config_only=false
+    positional_arguments=()
 
-# Handle archive creation (compressed backup)
-create_archive() {
-    local project_root="$1"
-    local project_name
-    project_name="$(basename "$project_root")"
-    local archive_flag="$2"
+    local expanded_arguments=()
+    for argument in "$@"; do
+        case "$argument" in
+            -a) expanded_arguments+=(--archive) ;;
+            -b) expanded_arguments+=(--backup) ;;
+            -c) expanded_arguments+=(--context) ;;
+            -e) expanded_arguments+=(--encrypt) ;;
+            -r) expanded_arguments+=(--remote) ;;
+            -*)
+                if [[ "$argument" =~ ^-[abce]{2,}$ ]]; then
+                    local combined_flags="${argument#-}"
+                    local index
+                    for ((index=0; index<${#combined_flags}; index++)); do
+                        case "${combined_flags:index:1}" in
+                            a) expanded_arguments+=(--archive) ;;
+                            b) expanded_arguments+=(--backup) ;;
+                            c) expanded_arguments+=(--context) ;;
+                            e) expanded_arguments+=(--encrypt) ;;
+                        esac
+                    done
+                else
+                    expanded_arguments+=("$argument")
+                fi
+                ;;
+            *)
+                expanded_arguments+=("$argument")
+                ;;
+        esac
+    done
 
-    # Only create archive if requested
-    if [[ "$CREATE_COMPRESSED_ARCHIVE" == "true" ]]; then
-        echo
-        echo "Creating compressed archive..."
+    set -- "${expanded_arguments[@]}"
 
-        # Get archive extension based on compression type
-        local archive_ext
-        archive_ext=$(get_archive_extension "$COMPRESSION_TYPE")
+    while (( $# > 0 )); do
+        case "$1" in
+            --backup|-b)
+                backup_requested=true
+                if [[ -n "${2:-}" && "${2:0:1}" != "-" && "${2}" =~ \.bak$ ]]; then
+                    backup_output="$2"
+                    shift 2
+                else
+                    shift
+                fi
+                ;;
+            --archive|-a)
+                archive_requested=true
+                if [[ -n "${2:-}" && "${2:0:1}" != "-" && "${2}" =~ \.(tar\.|tgz|tbz2|txz).*$ ]]; then
+                    archive_output="$2"
+                    shift 2
+                else
+                    shift
+                fi
+                ;;
+            --encrypt|-e)
+                encrypt_requested=true
+                if [[ -n "${2:-}" && "${2:0:1}" != "-" && "${2}" =~ \.gpg$ ]]; then
+                    encrypt_output="$2"
+                    shift 2
+                else
+                    shift
+                fi
+                ;;
+            --context|-c)
+                context_requested=true
+                if [[ -n "${2:-}" && "${2:0:1}" != "-" && ( "${2}" =~ \.[a-z]+$ || "${2:0:1}" == "/" ) ]]; then
+                    context_output="$2"
+                    shift 2
+                else
+                    shift
+                fi
+                ;;
+            --remote|-r)
+                if [[ -z "${2:-}" ]]; then
+                    echo "Error: --remote requires SERVER:/PATH argument" >&2
+                    exit 1
+                fi
+                remote_target="$2"
+                shift 2
+                ;;
+            --type)
+                if [[ -z "${2:-}" ]]; then
+                    echo "Error: --type requires an argument" >&2
+                    exit 1
+                fi
+                if [[ -n "$type_name" ]]; then
+                    type_name="${type_name}|${2}"
+                else
+                    type_name="$2"
+                fi
+                shift 2
+                ;;
+            --verify)
+                verify_option="true"
+                shift
+                ;;
+            --timestamp)
+                timestamp_mode=true
+                shift
+                ;;
+            --target)
+                if [[ -z "${2:-}" ]]; then
+                    echo "Error: --target requires a directory path" >&2
+                    exit 1
+                fi
+                target_directory="$2"
+                shift 2
+                ;;
+            --basename)
+                if [[ -z "${2:-}" ]]; then
+                    echo "Error: --basename requires a filename" >&2
+                    exit 1
+                fi
+                custom_basename="$2"
+                shift 2
+                ;;
+            --config)
+                config_only=true
+                shift
+                ;;
+            --help|-h)
+                backup_usage
+                exit 0
+                ;;
+            --*)
+                echo "Error: Unknown option '$1'" >&2
+                exit 1
+                ;;
+            *)
+                positional_arguments+=("$1")
+                shift
+                ;;
+        esac
+    done
+}
 
-        # Determine archive location
-        local archive_dir archive_file
-        if [[ -n "$archive_flag" ]]; then
-            # If archive_flag ends with / or is a directory, treat it as target directory
-            if [[ "$archive_flag" == */ ]] || [[ -d "$archive_flag" ]]; then
-                archive_dir="$archive_flag"
-                timestamp="$(date '+%Y%m%d-%H%M%S')"
-                archive_file="$archive_dir/${project_name}-${timestamp}${archive_ext}"
-            else
-                archive_file="$archive_flag"
-                archive_dir="$(dirname "$archive_file")"
+handle_timestamp_mode() {
+    local target_path="$1"
+    if [[ "$timestamp_mode" != "true" ]]; then
+        return
+    fi
+
+    if [[ ! -f "$target_path" ]]; then
+        echo "Error: --timestamp requires a file path" >&2
+        exit 1
+    fi
+
+    local file="$target_path"
+    local base
+    local extension
+    if [[ "$file" =~ ^(.*)\.tar\.(.*)$ ]]; then
+        base="${BASH_REMATCH[1]}"
+        extension="tar.${BASH_REMATCH[2]}"
+    elif [[ "$file" =~ \.(tgz|tbz2|txz)$ ]]; then
+        base="${file%.*}"
+        extension="${file##*.}"
+    else
+        echo "Error: Not an archive file" >&2
+        exit 1
+    fi
+
+    local timestamp
+    timestamp="$(date -r "$file" +%Y%m%d-%H%M%S)"
+    local new_file="${base}-${timestamp}.${extension}"
+    mv "$file" "$new_file"
+    echo "Renamed: $file -> $new_file"
+    exit 0
+}
+
+backup_main() {
+    parse_backup_arguments "$@"
+
+    local project_input="${positional_arguments[0]:-}"
+    local project_root
+    project_root="$(template_require_project_root "$project_input")"
+
+    handle_timestamp_mode "$project_root"
+
+    local additional_paths=()
+    if [[ ${#positional_arguments[@]} -gt 1 ]]; then
+        local index
+        for ((index=1; index<${#positional_arguments[@]}; index++)); do
+            local resolved_path
+            resolved_path="$(realpath "${positional_arguments[$index]}" 2>/dev/null)" || {
+                echo "Error: Invalid path '${positional_arguments[$index]}'" >&2
+                exit 1
+            }
+            if [[ "$resolved_path" == "/" ]]; then
+                echo "Error: Refusing to operate on '/'" >&2
+                exit 1
             fi
-        else
-            # Use archive directory as configured (already resolved in config.sh)
-            archive_dir="$(realpath "${ARCHIVE_BASE_DIR/#\~/$HOME}")"
-            mkdir -p "$archive_dir"
-            timestamp="$(date '+%Y%m%d-%H%M%S')"
-            archive_file="$archive_dir/${project_name}-${timestamp}${archive_ext}"
+            additional_paths+=("$resolved_path")
+        done
+    fi
+
+    if [[ ! -d "$project_root" ]]; then
+        if [[ -f "$project_root" ]]; then
+            local single_file_path="$project_root"
+            project_root="$(dirname "$project_root")"
+
+            load_config "$project_root" "$type_name"
+            if [[ -z "$verify_option" ]]; then
+                if [[ "${VERIFY:-}" == "true" || "${VERIFY_DEFAULT:-false}" == "true" ]]; then
+                    verify_option="true"
+                fi
+            fi
+            if [[ "$config_only" == "true" ]]; then
+                show_config "$project_root"
+                exit 0
+            fi
+
+            if [[ "$encrypt_requested" == "true" ]]; then
+                if [[ -z "$GPG_KEY_ID" ]]; then
+                    echo "Error: GPG key not configured. Set GPG_KEY_ID in config." >&2
+                    exit 1
+                fi
+                do_single_file_encryption "$single_file_path"
+                exit 0
+            fi
+
+            do_single_file_backup "$single_file_path"
+            exit 0
         fi
 
-        # Convert RSYNC_EXCLUDES to tar exclude patterns
-        tar_excludes=()
-        for exclude in "${RSYNC_EXCLUDES[@]}"; do
-            if [[ "$exclude" != "--exclude" ]]; then
-                # Convert rsync patterns to tar patterns
-                # rsync: '.git/' -> tar: './.git' (tar sees paths starting with ./)
-                local tar_pattern="$exclude"
-                if [[ "$tar_pattern" == *"/" ]]; then
-                    # Remove trailing slash and prepend ./
-                    tar_pattern="./${tar_pattern%/}"
-                elif [[ "$tar_pattern" != ./* && "$tar_pattern" != "*"* ]]; then
-                    # Prepend ./ for literal paths that don't start with ./ or contain *
-                    tar_pattern="./$tar_pattern"
-                fi
-                tar_excludes+=(--exclude="$tar_pattern")
-            fi
-        done
+        echo "Error: Directory or file does not exist: $project_root" >&2
+        exit 1
+    fi
 
-        # Create archive directly in target location with verbosity
-        echo "  - Creating archive: $archive_file (compression: $COMPRESSION_TYPE)"
-        local tar_args
-        mapfile -t tar_args < <(build_tar_args "$COMPRESSION_TYPE" "$archive_file" "${tar_excludes[@]}" | tr '\0' '\n')
-        tar_args+=("-C" "$project_root")
-        tar_args+=(".")
-        tar -cv "${tar_args[@]}"
+    load_config "$project_root" "$type_name"
 
-        if [[ $? -eq 0 ]]; then
-            archive_size=$(du -sh "$archive_file" | cut -f1)
-            echo "  - Archive created successfully: $archive_size"
+    if [[ -z "$verify_option" ]]; then
+        if [[ "${VERIFY:-}" == "true" || "${VERIFY_DEFAULT:-false}" == "true" ]]; then
+            verify_option="true"
+        fi
+    fi
 
-            # Encrypt archive if GPG key configured
-            if [[ -n "$GPG_KEY_ID" ]]; then
-                local encrypted_file="${archive_file}${GPG_OUTPUT_EXTENSION}"
-                echo "  - Encrypting archive with GPG..."
-                if encrypt_existing_archive "$archive_file" "$encrypted_file" "$GPG_KEY_ID"; then
-                    echo "  - Archive encrypted: $(basename "$encrypted_file")"
-                    # Use encrypted file for remote sync
-                    archive_file="$encrypted_file"
-                else
-                    echo "  - GPG encryption failed"
-                fi
-            fi
+    if [[ "$config_only" == "true" ]]; then
+        show_config "$project_root"
+        exit 0
+    fi
 
-            # Sync to remote if configured
-            if [[ -n "$REMOTE_SERVER" && -n "$REMOTE_PATH" ]]; then
-                if sync_to_remote "$archive_file" "$REMOTE_SERVER" "$REMOTE_PATH" "$HASH_ALGORITHM" "$CLEANUP_AFTER_TRANSFER" "false"; then
-                    echo "  - Remote sync completed successfully"
-                else
-                    echo "  - Remote sync failed"
-                fi
-            fi
+    local operations_performed=false
 
-            # Rotate old archives if MAX_ARCHIVES > 0
-            if [[ "$MAX_ARCHIVES" -gt 0 && -z "$archive_flag" ]]; then
-                # List archives by modification time, newest first
-                # Use wildcard pattern that matches the current compression type
-                local archive_pattern="$archive_dir/${project_name}-*${archive_ext}"
-                mapfile -t archives < <(ls -1t $archive_pattern 2>/dev/null || true)
-
-                if [[ ${#archives[@]} -gt $MAX_ARCHIVES ]]; then
-                    echo "  - Rotating archives (keeping $MAX_ARCHIVES most recent)"
-                    for ((i=MAX_ARCHIVES; i<${#archives[@]}; i++)); do
-                        rm -f "${archives[i]}"
-                        echo "    Removed: $(basename "${archives[i]}")"
-                    done
-                fi
-            fi
+    if [[ "$backup_requested" == "true" ]]; then
+        if [[ -n "$target_directory" ]]; then
+            local original_backup_base_dir="$BACKUP_BASE_DIR"
+            local original_context_base_dir="$CONTEXT_BASE_DIR"
+            BACKUP_BASE_DIR="$target_directory"
+            CONTEXT_BASE_DIR="$target_directory"
+            do_backup "$project_root"
+            BACKUP_BASE_DIR="$original_backup_base_dir"
+            CONTEXT_BASE_DIR="$original_context_base_dir"
         else
-            echo "  - Warning: Failed to create compressed archive"
+            do_backup "$project_root"
+        fi
+        operations_performed=true
+        if [[ "$verify_option" == "true" ]]; then
+            verify_mirror_integrity "$project_root" "$MAIN_BACKUP_DIR" || true
+        fi
+    fi
+
+    if [[ "$archive_requested" == "true" ]]; then
+        local output_path="$archive_output"
+
+        if [[ ${#additional_paths[@]} -gt 0 ]]; then
+            local all_paths=("$project_root" "${additional_paths[@]}")
+            if [[ -z "$output_path" ]]; then
+                local archive_basename
+                if [[ -n "$custom_basename" ]]; then
+                    archive_basename="$custom_basename"
+                else
+                    local timestamp
+                    timestamp="$(date '+%Y%m%d-%H%M%S')"
+                    archive_basename="multi-origin-${timestamp}"
+                fi
+                if [[ -n "$target_directory" ]]; then
+                    output_path="$target_directory/${archive_basename}$(get_archive_extension "$COMPRESSION_TYPE")"
+                else
+                    output_path="./${archive_basename}$(get_archive_extension "$COMPRESSION_TYPE")"
+                fi
+            fi
+            create_multi_origin_archive "$output_path" "${all_paths[@]}"
+        else
+            if [[ -z "$output_path" ]]; then
+                if [[ -n "$custom_basename" || -n "$target_directory" ]]; then
+                    local archive_basename
+                    if [[ -n "$custom_basename" ]]; then
+                        archive_basename="$custom_basename"
+                    else
+                        archive_basename="$(basename "$project_root")"
+                    fi
+                    local base_output_path
+                    if [[ -n "$target_directory" ]]; then
+                        base_output_path="$target_directory/${archive_basename}$(get_archive_extension "$COMPRESSION_TYPE")"
+                    else
+                        base_output_path="$(dirname "$project_root")/${archive_basename}$(get_archive_extension "$COMPRESSION_TYPE")"
+                    fi
+                    if [[ "$ARCHIVE_VERSIONING" == "force_timestamp" ]]; then
+                        local timestamp
+                        timestamp="$(date '+%Y%m%d-%H%M%S')"
+                        local archive_extension
+                        archive_extension="$(get_archive_extension "$COMPRESSION_TYPE")"
+                        local basename_path="${base_output_path%"$archive_extension"}"
+                        output_path="${basename_path}-${timestamp}${archive_extension}"
+                    else
+                        output_path="$(resolve_archive_path_with_deduplication "$base_output_path")"
+                    fi
+                else
+                    output_path=""
+                fi
+            fi
+            create_archive_only "$project_root" "$output_path"
+        fi
+
+        operations_performed=true
+
+        if [[ -n "$remote_target" ]]; then
+            local archive_file="$output_path"
+            if [[ -z "$archive_file" || ! -f "$archive_file" ]]; then
+                local parent_dir
+                parent_dir="$(dirname "$project_root")"
+                local base_name
+                base_name="$(basename "$project_root")"
+                local extension
+                extension="$(get_archive_extension "$COMPRESSION_TYPE")"
+                mapfile -t candidates < <(ls -1t "$parent_dir"/"$base_name"-*"$extension" 2>/dev/null || true)
+                if [[ ${#candidates[@]} -gt 0 ]]; then
+                    archive_file="${candidates[0]}"
+                else
+                    archive_file="$parent_dir/$base_name$extension"
+                fi
+            fi
+            sync_archive_to_remote "$archive_file" "$remote_target"
+        fi
+
+        if [[ "$verify_option" == "true" ]]; then
+            local final_archive="$output_path"
+            if [[ -z "$final_archive" ]]; then
+                local parent_dir
+                parent_dir="$(dirname "$project_root")"
+                local base_name
+                base_name="$(basename "$project_root")"
+                local extension
+                extension="$(get_archive_extension "$COMPRESSION_TYPE")"
+                mapfile -t candidates < <(ls -1t "$parent_dir"/"$base_name"-*"$extension" 2>/dev/null || true)
+                if [[ ${#candidates[@]} -gt 0 ]]; then
+                    final_archive="${candidates[0]}"
+                fi
+            fi
+            if [[ -n "$final_archive" && -f "$final_archive" ]]; then
+                verify_archive_against_dir "$final_archive" "$project_root" "$(basename "$project_root")" || true
+                if [[ -n "$remote_target" ]]; then
+                    local remote_server="${remote_target%%:*}"
+                    local remote_path="${remote_target#*:}"
+                    : "${HASH_ALGORITHM:=sha256}"
+                    verify_remote_file_hash "$final_archive" "$remote_server" "$remote_path" "$HASH_ALGORITHM" || true
+                fi
+            fi
+        fi
+    fi
+
+    if [[ "$encrypt_requested" == "true" ]]; then
+        local output_path="$encrypt_output"
+
+        if [[ ${#additional_paths[@]} -gt 0 ]]; then
+            local all_paths=("$project_root" "${additional_paths[@]}")
+            if [[ -z "$output_path" ]]; then
+                local encrypt_basename
+                if [[ -n "$custom_basename" ]]; then
+                    encrypt_basename="$custom_basename"
+                else
+                    local timestamp
+                    timestamp="$(date '+%Y%m%d-%H%M%S')"
+                    encrypt_basename="multi-origin-${timestamp}"
+                fi
+                if [[ -n "$target_directory" ]]; then
+                    output_path="$target_directory/${encrypt_basename}$(get_archive_extension "$COMPRESSION_TYPE")${GPG_OUTPUT_EXTENSION:-.gpg}"
+                else
+                    output_path="./${encrypt_basename}$(get_archive_extension "$COMPRESSION_TYPE")${GPG_OUTPUT_EXTENSION:-.gpg}"
+                fi
+            fi
+            create_multi_origin_gpg "$output_path" "${all_paths[@]}"
+        else
+            if [[ -z "$output_path" ]]; then
+                local encrypt_basename
+                if [[ -n "$custom_basename" ]]; then
+                    encrypt_basename="$custom_basename"
+                else
+                    encrypt_basename="$(basename "$project_root")"
+                fi
+                if [[ -n "$target_directory" ]]; then
+                    output_path="$target_directory/${encrypt_basename}$(get_archive_extension "$COMPRESSION_TYPE")${GPG_OUTPUT_EXTENSION:-.gpg}"
+                else
+                    output_path="$(dirname "$project_root")/${encrypt_basename}$(get_archive_extension "$COMPRESSION_TYPE")${GPG_OUTPUT_EXTENSION:-.gpg}"
+                fi
+            fi
+            create_gpg "$project_root" "$output_path"
+        fi
+
+        operations_performed=true
+
+        if [[ -n "$remote_target" ]]; then
+            local encrypted_file="$output_path"
+            if [[ -z "$encrypted_file" || ! -f "$encrypted_file" ]]; then
+                local parent_dir
+                parent_dir="$(dirname "$project_root")"
+                local base_name
+                base_name="$(basename "$project_root")"
+                local archive_extension
+                archive_extension="$(get_archive_extension "$COMPRESSION_TYPE")"
+                local gpg_extension="${GPG_OUTPUT_EXTENSION:-.gpg}"
+                mapfile -t candidates < <(ls -1t "$parent_dir"/"$base_name"-*"$archive_extension""$gpg_extension" 2>/dev/null || true)
+                if [[ ${#candidates[@]} -gt 0 ]]; then
+                    encrypted_file="${candidates[0]}"
+                else
+                    encrypted_file="$parent_dir/$base_name$archive_extension$gpg_extension"
+                fi
+            fi
+            sync_archive_to_remote "$encrypted_file" "$remote_target"
+        fi
+
+        if [[ "$verify_option" == "true" ]]; then
+            local final_encrypted="$output_path"
+            if [[ -n "$final_encrypted" && -f "$final_encrypted" ]]; then
+                echo "Local encrypted hash (sha256): $(sha256sum "$final_encrypted" | awk '{print $1}')"
+            fi
+            if [[ -n "$remote_target" && -n "$final_encrypted" ]]; then
+                local remote_server="${remote_target%%:*}"
+                local remote_path="${remote_target#*:}"
+                : "${HASH_ALGORITHM:=sha256}"
+                verify_remote_file_hash "$final_encrypted" "$remote_server" "$remote_path" "$HASH_ALGORITHM" || true
+            fi
+        fi
+    fi
+
+    if [[ "$context_requested" == "true" ]]; then
+        local output_path="$context_output"
+        if [[ -n "$target_directory" && -z "$output_path" ]]; then
+            local project_name
+            project_name="$(basename "$project_root")"
+            output_path="$target_directory/${project_name}.context"
+        fi
+        create_context_only "$project_root" "$output_path"
+        operations_performed=true
+        if [[ "$verify_option" == "true" ]]; then
+            local final_context="$output_path"
+            if [[ -z "$final_context" ]]; then
+                final_context=$(resolve_base_dir "$CONTEXT_BASE_DIR" "$project_root" "$(basename "$project_root")" ".context")
+            fi
+            verify_mirror_integrity "$project_root" "$final_context" || true
+        fi
+    fi
+
+    if [[ -n "$remote_target" && "$archive_requested" == "false" && "$encrypt_requested" == "false" ]]; then
+        sync_to_remote "$project_root" "$remote_target"
+        operations_performed=true
+    fi
+
+    if [[ "$operations_performed" == "false" ]]; then
+        do_backup "$project_root"
+        if [[ "$CONFIG_FOUND" == "true" ]]; then
+            local project_name
+            project_name="$(basename "$project_root")"
+            local mirror_dir_path
+            if [[ -n "$CONTEXT_BASE_DIR" ]]; then
+                mirror_dir_path="$CONTEXT_BASE_DIR/$project_name"
+            else
+                MAIN_BACKUP_DIR="$BACKUP_BASE_DIR/${project_name}.bak"
+                mirror_dir_path="$MAIN_BACKUP_DIR/$project_name"
+            fi
+            show_backup_stats "$project_root" "$mirror_dir_path"
         fi
     fi
 }
 
-# If called directly as a command
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-    # Handle help flag
-    if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
-        cat << 'EOF'
-Usage: backup.sh [OPTIONS] [PROJECT_PATH]
-
-Create backup and context mirror of a project (default ilma behavior).
-
-OPTIONS:
-  --backup [OUTPUT_PATH]               Create backup directory (explicit)
-  --archive [OUTPUT_PATH]              Create compressed archive only
-  --encrypt [OUTPUT_PATH]              Create encrypted archive only
-  --context [OUTPUT_PATH]              Create context mirror only
-  --remote SERVER:/PATH                Sync directly to remote server
-
-ARGUMENTS:
-  PROJECT_PATH    Path to project directory (default: current directory)
-
-Examples:
-  ./commands/backup.sh /path/to/project
-  ./commands/backup.sh --archive /path/to/project
-  ./commands/backup.sh --encrypt --remote srv:/backup
-
-This tool uses the same configuration system as the main ilma command.
-EOF
-        exit 0
-    fi
-
-    # This would be the backup command entry point
-    PROJECT_ROOT="${1:-$(pwd)}"
-    ARCHIVE_FLAG="${2:-}"
-
-    # Load configuration first
-    source "$ILMA_DIR/commands/config.sh"
-    load_config "$PROJECT_ROOT"
-    handle_special_modes "$ARCHIVE_FLAG" "$PROJECT_ROOT"
-
-    # Perform backup
-    do_backup "$PROJECT_ROOT"
-
-    # Create archive if needed
-    create_archive "$PROJECT_ROOT" "$ARCHIVE_FLAG"
+    template_dispatch backup_usage backup_main "$@"
 fi

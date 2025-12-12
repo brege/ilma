@@ -1,14 +1,87 @@
 #!/bin/bash
-# commands/decrypt.sh - Decrypt and extract operations
+set -euo pipefail
 
-ILMA_DIR="$(dirname "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")")"
+source "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/_template.sh"
+template_initialize_paths
+
+source "$ILMA_DIR/lib/deps/gpg.sh"
+source "$ILMA_DIR/lib/extract.sh"
+
+no_extract_option=false
+force_option=false
+target_directory_option=""
+input_path=""
+
+decrypt_usage() {
+    cat <<'EOF'
+Usage: ilma decrypt [OPTIONS] <encrypted_file>
+
+Decrypt a GPG-encrypted file and optionally extract if it is an archive.
+
+OPTIONS:
+  --no-extract       Decrypt only, do not extract archive
+  --force            Replace existing target directory when extracting
+  --target DIR       Extract to specific directory instead of derived name
+  -h, --help         Show this help message
+EOF
+}
+
+parse_decrypt_arguments() {
+    no_extract_option=false
+    force_option=false
+    target_directory_option=""
+    input_path=""
+
+    while (( $# > 0 )); do
+        case "$1" in
+            --no-extract)
+                no_extract_option=true
+                shift
+                ;;
+            --force)
+                force_option=true
+                shift
+                ;;
+            --target)
+                if [[ -z "${2:-}" ]]; then
+                    echo "Error: --target requires a directory path" >&2
+                    exit 1
+                fi
+                target_directory_option="$2"
+                shift 2
+                ;;
+            -h|--help)
+                decrypt_usage
+                exit 0
+                ;;
+            --*)
+                echo "Error: Unknown option '$1'" >&2
+                exit 1
+                ;;
+            *)
+                if [[ -z "$input_path" ]]; then
+                    input_path="$1"
+                else
+                    echo "Error: Too many arguments provided" >&2
+                    exit 1
+                fi
+                shift
+                ;;
+        esac
+    done
+
+    if [[ -z "$input_path" ]]; then
+        echo "Error: No input file specified for decryption" >&2
+        exit 1
+    fi
+}
 
 # Decrypt and optionally extract a GPG-encrypted file
 do_decrypt() {
     local input_file="$1"
     local no_extract_flag="${2:-false}"
     local force_flag="${3:-false}"
-    local outdir="${4:-}"
+    local target_directory="${4:-}"
 
     if [[ -z "$input_file" ]]; then
         echo "Error: No input file specified for decryption" >&2
@@ -20,31 +93,27 @@ do_decrypt() {
         return 1
     fi
 
-    # Source required libraries
-    source "$ILMA_DIR/lib/deps/gpg.sh"
-    source "$ILMA_DIR/lib/deps/compression.sh"
+    local output_file
+    output_file="$input_file"
 
-    # Decrypt first
-    local output_file="${input_file%.gpg}"
-
-    if ! decrypt_file "$input_file" "$output_file"; then
-        return 1
+    if [[ "$input_file" =~ \.gpg$ ]]; then
+        output_file="${input_file%.gpg}"
+        if ! decrypt_file "$input_file" "$output_file"; then
+            return 1
+        fi
     fi
 
-    # If --no-extract flag is set, stop here
     if [[ "$no_extract_flag" == "true" ]]; then
         echo "Decryption complete: $output_file"
         return 0
     fi
 
-    # If not an archive, nothing more to do
     if ! is_archive "$output_file"; then
         echo "Decryption complete: $output_file"
         return 0
     fi
 
-    # Extract the archive using the same logic as extract command
-    if extract_decrypted_archive "$output_file" "$force_flag" "$outdir"; then
+    if extract_decrypted_archive "$output_file" "$force_flag" "$target_directory"; then
         echo "Decryption and extraction complete: $(basename "$output_file" .tar.*)"
         return 0
     else
@@ -52,97 +121,21 @@ do_decrypt() {
     fi
 }
 
-# Extract a decrypted archive with conflict resolution
 extract_decrypted_archive() {
     local archive_file="$1"
     local force_flag="${2:-false}"
-    local outdir="${3:-}"
+    local target_directory="${3:-}"
 
-    # Determine target directory name using same logic as extract command
-    local archive_base
-    archive_base="$(basename "$archive_file")"
+    local resolved_target
+    resolved_target="$(resolve_archive_target_directory "$archive_file" "$target_directory")"
 
-    local target_dir
-    if [[ -n "$outdir" ]]; then
-        # User specified output directory
-        target_dir="$outdir"
-    else
-        # Use same directory naming logic as extract command
-        if [[ "$archive_base" =~ \.[^.]+\.tar\. ]]; then
-            # Complex case: preserve middle parts
-            target_dir="$archive_base"
-            target_dir="${target_dir%.tar.zst}"
-            target_dir="${target_dir%.tar.gz}"
-            target_dir="${target_dir%.tar.bz2}"
-            target_dir="${target_dir%.tar.xz}"
-            target_dir="${target_dir%.tar}"
-            target_dir="${target_dir%.tgz}"
-            target_dir="${target_dir%.tbz2}"
-            target_dir="${target_dir%.txz}"
-            target_dir="${target_dir%.gpg}"
-        else
-            # Simple case: remove all extensions
-            target_dir="${archive_base%%.*}"
-        fi
-    fi
-
-    # Handle directory conflicts
-    if [[ -e "$target_dir" ]]; then
-        if [[ "$force_flag" == "true" ]]; then
-            echo "Removing existing directory: $target_dir"
-            if [[ -L "$target_dir" ]]; then
-                echo "Error: Refusing to remove symlink target: $target_dir" >&2
-                return 1
-            fi
-            rm -rf "$target_dir"
-        else
-            echo "Error: Target directory already exists: $target_dir"
-            echo "Use --force to replace, or --target to specify different location"
-            return 1
-        fi
-    fi
-
-    # Preflight: list archive members and reject unsafe paths (absolute or ..)
-    local tar_option list_ok
-    tar_option=$(get_tar_option "$(get_compression_type_from_file "$archive_file")")
-    if [[ -n "$tar_option" ]]; then
-        if tar $tar_option -tf "$archive_file" | LC_ALL=C grep -E '(^/|(^|/)\.\.(\/|$))' -q; then
-            echo "Error: Unsafe archive entries detected (absolute paths or ..)" >&2
-            return 1
-        fi
-    else
-        if tar -tf "$archive_file" | LC_ALL=C grep -E '(^/|(^|/)\.\.(\/|$))' -q; then
-            echo "Error: Unsafe archive entries detected (absolute paths or ..)" >&2
-            return 1
-        fi
-    fi
-
-    echo "Safely extracting $archive_file to $target_dir/"
-    mkdir -p "$target_dir"
-
-    # Extract using same logic as extract command
-
-    if [[ -n "$tar_option" ]]; then
-        tar $tar_option -xf "$archive_file" -C "$target_dir"
-    else
-        tar -xf "$archive_file" -C "$target_dir"
-    fi
-
-    if [[ $? -eq 0 ]]; then
-        echo "Archive extracted successfully to: $target_dir/"
-        return 0
-    else
-        echo "Extraction failed"
-        rmdir "$target_dir" 2>/dev/null
-        return 1
-    fi
+    extract_archive_safely "$archive_file" "$force_flag" "$resolved_target"
 }
 
-# Enhanced extract with conflict resolution (for standalone extract command)
 do_extract() {
     local archive_file="$1"
     local force_flag="${2:-false}"
-    local outdir="${3:-}"
+    local target_directory="${3:-}"
 
     if [[ -z "$archive_file" ]]; then
         echo "Error: No archive file specified for extraction" >&2
@@ -154,43 +147,52 @@ do_extract() {
         return 1
     fi
 
-    source "$ILMA_DIR/lib/deps/compression.sh"
+    local resolved_target
+    resolved_target="$(resolve_archive_target_directory "$archive_file" "$target_directory")"
 
-    if ! is_archive "$archive_file"; then
-        echo "Error: File is not a recognized archive: $archive_file" >&2
-        return 1
-    fi
-
-    # Use the same extraction logic as decrypt
-    if extract_decrypted_archive "$archive_file" "$force_flag" "$outdir"; then
-        # Show contents for standalone extract command
-        if [[ -n "$outdir" ]]; then
-            echo "Contents:"
-            ls -la "$outdir/"
-        else
-            # Determine what directory was created using same logic
-            local archive_base
-            archive_base="$(basename "$archive_file")"
-            local target_dir
-            if [[ "$archive_base" =~ \.[^.]+\.tar\. ]]; then
-                target_dir="$archive_base"
-                target_dir="${target_dir%.tar.zst}"
-                target_dir="${target_dir%.tar.gz}"
-                target_dir="${target_dir%.tar.bz2}"
-                target_dir="${target_dir%.tar.xz}"
-                target_dir="${target_dir%.tar}"
-                target_dir="${target_dir%.tgz}"
-                target_dir="${target_dir%.tbz2}"
-                target_dir="${target_dir%.txz}"
-                target_dir="${target_dir%.gpg}"
-            else
-                target_dir="${archive_base%%.*}"
-            fi
-            echo "Contents:"
-            ls -la "$target_dir/"
-        fi
+    if extract_archive_safely "$archive_file" "$force_flag" "$resolved_target"; then
+        echo "Contents:"
+        ls -la "$resolved_target/"
         return 0
     else
         return 1
     fi
 }
+
+decrypt_main() {
+    parse_decrypt_arguments "$@"
+
+    if [[ "$input_path" == "/" ]]; then
+        echo "Error: Invalid path '/'" >&2
+        exit 1
+    fi
+
+    if [[ ! -f "$input_path" ]]; then
+        echo "Error: Input file does not exist: $input_path" >&2
+        exit 1
+    fi
+
+    local absolute_input
+    absolute_input="$(realpath "$input_path")"
+
+    local target_directory_value="$target_directory_option"
+    if [[ -n "$target_directory_value" ]]; then
+        target_directory_value="$(realpath -m "$target_directory_value")"
+    fi
+
+    local no_extract_flag="false"
+    if [[ "$no_extract_option" == "true" ]]; then
+        no_extract_flag="true"
+    fi
+
+    local force_flag="false"
+    if [[ "$force_option" == "true" ]]; then
+        force_flag="true"
+    fi
+
+    do_decrypt "$absolute_input" "$no_extract_flag" "$force_flag" "$target_directory_value"
+}
+
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    template_dispatch decrypt_usage decrypt_main "$@"
+fi
