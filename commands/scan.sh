@@ -186,10 +186,10 @@ scan_main() {
     done
     ALL_PRUNE_DIRS+=("*.bak")
 
-    PRUNE_EXPR=""
+    PRUNE_ARGS=()
     for pd in "${ALL_PRUNE_DIRS[@]}"; do
-        [[ -n "$PRUNE_EXPR" ]] && PRUNE_EXPR+=" -o "
-        PRUNE_EXPR+="-name $pd"
+        (( ${#PRUNE_ARGS[@]} > 0 )) && PRUNE_ARGS+=(-o)
+        PRUNE_ARGS+=(-name "$pd")
     done
 
     for proj_dir in "${project_dirs[@]}"; do
@@ -201,13 +201,13 @@ scan_main() {
         for pat in "${JUNK_PATTERNS[@]}"; do
             while IFS= read -r -d '' f; do
                 all_junk+=("$f")
-            done < <(find "$proj_dir" \( $PRUNE_EXPR \) -prune -false -o -type f -name "$pat" -print0 2>/dev/null || true)
+            done < <(find "$proj_dir" \( "${PRUNE_ARGS[@]}" \) -prune -false -o -type f -name "$pat" -print0 2>/dev/null || true)
         done
 
         for dir_pat in "${JUNK_DIRS[@]}"; do
             while IFS= read -r -d '' d; do
                 all_junk+=("$d/")
-            done < <(find "$proj_dir" \( $PRUNE_EXPR \) -prune -false -o -type d -name "$dir_pat" -print0 2>/dev/null || true)
+            done < <(find "$proj_dir" \( "${PRUNE_ARGS[@]}" \) -prune -false -o -type d -name "$dir_pat" -print0 2>/dev/null || true)
         done
 
         if (( ${#all_junk[@]} > 0 )); then
