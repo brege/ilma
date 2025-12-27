@@ -101,6 +101,11 @@ load_config() {
 
     # Load project-local configuration (enables full pipeline)
     if [[ -f "$project_root/.ilma.conf" ]]; then
+        # Warn if --type was specified but will be overridden by local config
+        if [[ -n "$type" ]]; then
+            echo "Warning: Local .ilma.conf found; ignoring --type $type" >&2
+        fi
+
         # First pass: check if PROJECT_TYPE is specified
         PROJECT_TYPE=""
         source "$project_root/.ilma.conf"
