@@ -4,7 +4,7 @@
   should-be-Bash task or within the scope of ilma? 
 
 - Current `.ilma.conf` uses rsync‑specific args that leak transport
-  tool specifics, and mixed with fragmented bash contructs.
+  tool specifics, and mixed with fragmented bash constructs.
   
   Consider implementing a proper schema for project types.
 

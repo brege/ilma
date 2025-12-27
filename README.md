@@ -108,7 +108,9 @@ Validate dependencies
 ilma validate --dependencies
 ```
 
-> [!NOTE] **Compression Algorithms**
+> [!NOTE] 
+> **Compression Algorithms**  
+>
 > The default compression library used in this project is [Zstandard (`zstd`)](https://github.com/facebook/zstd). This is a personal choice, which I use because of good performance on Btrfs filesystems.  Zstandard is also [the algorithm restic uses](https://restic.readthedocs.io/en/latest/100_references.html). While `zstd` is not yet as widely supported across all platforms as `gzip`, `bzip2`, or `xz` (in that order), it is available on most modern Linux systems.
 >
 > Sources: [compression][1],  [speed][2], [usage][3]
@@ -237,10 +239,16 @@ id=admin@server.ini
 
 Restic doesn't work in this direction. Most people do not run an SSH server on their laptop, but many do on their NAS. Android phones also have small file count limits, so pure syncs of server material become impractical. `ilma`'s job mode extracts an archive from a collection of remote paths and can zip and encrypt them for agnostic portability.
 
+## Development
+
+- [Contributing](docs/contributing.md)
+
+- [Changelog](docs/changelog.md)
+
+- [Roadmap](docs/roadmap.md)
+
 ## License
 
 [GPLv3](https://www.gnu.org/licenses/gpl-3.0.en.html)
 
-## Development
 
-See [`lib/index.md`](./lib/index.md).

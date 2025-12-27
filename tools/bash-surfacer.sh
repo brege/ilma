@@ -14,7 +14,7 @@ OPTIONS:
   --comments=inline        show only inline code comments
   --echos                  show echo and printf commands
   --functions              show function definitions with truncated context
-   -n NUM                   limit number of function body to head -N
+   -n NUM                  limit number of function body to head -N
   --heredoc                show only heredoc/help text/usage blocks
   --args                   show only command-line argument flags
   -R, --recursive          recursively scan directories for *.sh files
