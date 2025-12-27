@@ -9,7 +9,7 @@ source "$ILMA_DIR/commands/config.sh"
 
 usage() {
     cat <<EOF
-Usage: ilma console [PROJECT_PATH]
+Usage: ilma console [OPTIONS] [PROJECT_PATH]
 
 Display project statistics and mirror reduction analysis.
 
@@ -17,6 +17,7 @@ ARGUMENTS:
   PROJECT_PATH     Path to project directory (default: current directory)
 
 OPTIONS:
+  --type TYPE      Project type configuration (python, node, bash, latex, etc.)
   -h, --help       Show this help message
 
 DESCRIPTION:
@@ -30,9 +31,14 @@ DESCRIPTION:
   The console view helps evaluate the impact of including your project
   in an LLM's context window by showing size and complexity metrics.
 
+  Specify --type to load file extension defaults for that project type,
+  providing more relevant statistics without needing a .ilma.conf file.
+
 EXAMPLES:
   ilma console                    # Show stats for current directory
   ilma console ~/my-project       # Show stats for specific project
+  ilma console --type python      # Show Python project stats
+  ilma console --type node ~/web-app  # Show Node.js project stats
 
 NOTES:
   - Statistics reflect actual files, not git-tracked files
@@ -45,11 +51,38 @@ EOF
 }
 
 console_main() {
-    local project_path="${1:-$(pwd)}"
+    local type_name=""
+    local project_path=""
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --type)
+                if [[ -z "${2:-}" ]]; then
+                    echo "Error: --type requires an argument" >&2
+                    return 1
+                fi
+                type_name="$2"
+                shift 2
+                ;;
+            -h|--help)
+                usage
+                ;;
+            -*)
+                echo "Error: Unknown option '$1'" >&2
+                return 1
+                ;;
+            *)
+                project_path="$1"
+                shift
+                ;;
+        esac
+    done
+
+    project_path="${project_path:-$(pwd)}"
     local project_root
     project_root="$(require_project_root "$project_path")"
 
-    load_config "$project_root"
+    load_config "$project_root" "$type_name"
     show_console_summary "$project_root"
 }
 
@@ -282,40 +315,5 @@ show_backup_stats() {
 }
 
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-    if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
-        usage
-    fi
     console_main "$@"
-fi
-
-# If called directly as a command
-if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-    # Handle help flag
-    if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
-        cat << 'EOF'
-Usage: console.sh [PROJECT_PATH]
-
-Standalone project analysis tool - shows detailed project statistics.
-
-Arguments:
-  PROJECT_PATH    Path to project directory (default: current directory)
-
-Examples:
-  ./commands/console.sh /path/to/project
-  ./commands/console.sh .
-
-Displays file counts, line counts, and size statistics organized by file extension.
-EOF
-        exit 0
-    fi
-
-    # This would be the analyze/console command entry point
-    PROJECT_ROOT="${1:-$(pwd)}"
-
-    # Load configuration first
-    source "$ILMA_DIR/commands/config.sh"
-    load_config "$PROJECT_ROOT"
-
-    # Show console summary
-    show_console_summary "$PROJECT_ROOT"
 fi
