@@ -108,6 +108,59 @@ app.listen(port, () => {
 });
 EOF
 
+cat > "$JS_DIR/src/server.ts" <<'EOF'
+import express from 'express';
+
+const app = express();
+const port: number = 3000;
+
+app.get('/api', (req, res) => {
+  res.json({ message: 'API endpoint' });
+});
+
+app.listen(port, () => {
+  console.log(`TypeScript server on port ${port}`);
+});
+EOF
+
+cat > "$JS_DIR/src/Button.jsx" <<'EOF'
+import React from 'react';
+
+export const Button = ({ label, onClick }) => {
+  return <button onClick={onClick}>{label}</button>;
+};
+EOF
+
+cat > "$JS_DIR/src/Button.tsx" <<'EOF'
+import React from 'react';
+
+interface ButtonProps {
+  label: string;
+  onClick: () => void;
+}
+
+export const Button: React.FC<ButtonProps> = ({ label, onClick }) => {
+  return <button onClick={onClick}>{label}</button>;
+};
+EOF
+
+cat > "$JS_DIR/src/utils.cjs" <<'EOF'
+module.exports = {
+  add: (a, b) => a + b,
+  subtract: (a, b) => a - b,
+};
+EOF
+
+cat > "$JS_DIR/src/helpers.mjs" <<'EOF'
+export const formatDate = (date) => {
+  return date.toISOString();
+};
+
+export const parseJSON = (str) => {
+  return JSON.parse(str);
+};
+EOF
+
 cat > "$JS_DIR/.ilma.conf" <<'EOF'
 # JS project configuration - archive, backup, context
 EXTENSIONS=(js json md css)
