@@ -6,7 +6,7 @@ A project backup and archival tool with selective project-type awareness, prunin
 
 - **Project-Type Awareness**
 
-  Automatic detection of and applies appropriate exclusions for Python, Node.js, LaTeX, Bash projects and can be extended to any project with build and run matter.
+  Automatic detection and application of appropriate exclusions for Python, Node.js, LaTeX, Bash projects, with extensibility for any project with build and runtime artifacts.
 
 - **Standard GPG, tar, and rsync core with ergonomic CLI**
 
@@ -16,29 +16,36 @@ A project backup and archival tool with selective project-type awareness, prunin
 
   Can be easily configured to automatically remove disposable files and directories based on a per-project or recursive cleanup task, logging events and creating backups for recovery.
 
-## Quick Start
+## Usage
 
-**Install**
+1. [**Install**](#installation)
 
-```bash
-git clone https://github.com/brege/ilma
-cd ilma
-./install
+2. `ilma --help`. All subcommands support `--help`.
 
-ilma --help
-```
+3. **Immediate Backup**
 
-**Immediate Backup**
+   By default, **ilma** will backup the current directory and store a copy as a sibling.
 
-By default, **ilma** will backup the current directory and store a copy as a sibling.
+   ```bash
+   cd my-project
+   ilma -a  # archive
+   tree -L1 ..
+   ..
+   ├── my-project
+   └── my-project.tar.zst
+   ```
 
-```bash
-cd my-project
-ilma -a
-ls ../
-# my-project/
-# my-project.tar.zst
-```
+   Or, you can specify a directory to backup, archive, or encrypt.
+
+   ```bash
+   ilma -e ~/Documents/love-letters/
+   tree -L1 ~/Documents
+   ~/Documents
+   ├── love-letters
+   └── love-letters.tar.zst.gpg
+   ```
+
+### More Examples
 
 **Prune crufty project files**
 
@@ -71,7 +78,7 @@ ilma validate
 **Context Overview**  
 Generate a token estimate of project context before and after pruning
 ```bash
-ilma console 
+ilma console --type [node|python|latex|bash]
 ```
 
 ## Installation
@@ -80,6 +87,7 @@ Clone the repository
 ```bash
 git clone https://github.com/brege/ilma
 cd ilma
+./install
 ```
 
 Fedora dependencies
@@ -97,20 +105,13 @@ sudo apt install zstd gzip bzip2 xz-utils
 
 Validate dependencies
 ```bash
-./lib/deps/deps.sh check
-./lib/deps/deps.sh install-help
+ilma validate --dependencies
 ```
 
-Add the **ilma** to your `$PATH`
-```bash
-echo 'export PATH="$PATH:/path/to/ilma"' >> ~/.bashrc
-source ~/.bashrc
-```
-
-> #### Compression Algorithm Note
+> [!NOTE] **Compression Algorithms**
 > The default compression library used in this project is [Zstandard (`zstd`)](https://github.com/facebook/zstd). This is a personal choice, which I use because of good performance on Btrfs filesystems.  Zstandard is also [the algorithm restic uses](https://restic.readthedocs.io/en/latest/100_references.html). While `zstd` is not yet as widely supported across all platforms as `gzip`, `bzip2`, or `xz` (in that order), it is available on most modern Linux systems.
 >
-> [ [compression][1] ][ [speed][2] ][ [usage][3] ]
+> Sources: [compression][1],  [speed][2], [usage][3]
 
 [1]: https://rsmith.home.xs4all.nl/miscellaneous/evaluating-zstandard-compression.html?utm_source=chatgpt.com
 [2]: https://patchwork.kernel.org/project/linux-btrfs/patch/20170629194108.1674498-4-terrelln%40fb.com/?utm_source=chatgpt.com
@@ -197,9 +198,7 @@ ilma decrypt file.tar.zst.gpg    # Decrypts and decompresses in one pass
 
 ## What ilma is and is not
 
-You use **ilma** to backup irreplaceable things like configs, databases, pictures, presentations, etc.
-You use **ilma** to quickly create archives from local and remote work, take them on the go securely, 
-and recover them when needed.
+**ilma** is an over-engineered wrapper. It is intended to backup irreplaceable things like configs, databases, pictures, presentations, etc on the go. I use **ilma** to quickly create archives from local and remote work, take them on the go securely, and recover them when needed. Often, I run `ilma -a .git` when I know I may mess something up in the Git tree or before performing a dangerous find+sed+{} on a codebase (the archive protects string replacements affecting `.git/` files).
 
 **ilma** is **NOT** intended to be a deduplication or synchronization tool.
 These tools offer better coverage for those tasks:
@@ -207,22 +206,15 @@ These tools offer better coverage for those tasks:
 - Recommended encrypted, deduplicated backups: [**restic**](https://restic.net/)
 - Recommended synchronization tool: [**syncthing**](https://syncthing.net/)
 
-Because **ilma** is written as a shell wrapper for common file-handling tools,
-ilma-"generated" files are completely recoverable without needing ilma.
-Restic requires restic for recovery.
-Syncthing is synchronous, and opaque in the only place you get encryption: "untrusted device" mode.
+Because **ilma** is written as a shell wrapper for common file-handling tools, `ilma`-generated files are completely recoverable without needing ilma. Restic requires restic for recovery. Syncthing is synchronous, and opaque in the only place you get encryption: "untrusted device" mode.
 
-**ilma** works in addition to restic and syncthing for different purposes.
-Restic efficiently backs up entire home directories with deduplication and versioning.
-Syncthing maintains synchronized state across devices.
-ilma can be used to create encrypted project snapshots for transport to untrusted storage.
+**ilma** works in addition to restic and syncthing for a complementary purpose. Restic efficiently backs up entire home directories with deduplication and versioning. Syncthing maintains synchronized state across devices. ilma can be used to create encrypted project snapshots for transport to untrusted storage.
 
 Since ilma can push to multiple destinations, additional encrypted archives can be placed in syncthing folders or backed up by restic alongside other data.
 
 ### Backing up remote configs, databases, etc
 
-Pull from remote machines (NAS, Raspberry Pi, servers) without running an SSH server on your local machine.
-Job manifests use rsync's filter syntax for selective transfer.
+Pull from remote machines (NAS, Raspberry Pi, servers) without running an SSH server on your local machine. Job manifests use rsync's filter syntax for selective transfer.
 
 ```bash
 ilma remote pull --job admin@server.ini
@@ -243,6 +235,7 @@ id=admin@server.ini
 ...
 ```
 
+Restic doesn't work in this direction. Most people do not run an SSH server on their laptop, but many do on their NAS. Android phones also have small file count limits, so pure syncs of server material become impractical. `ilma`'s job mode extracts an archive from a collection of remote paths and can zip and encrypt them for agnostic portability.
 
 ## License
 
