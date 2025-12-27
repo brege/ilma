@@ -11,7 +11,7 @@ trap 'rm -rf "$temporary_root"' EXIT
 
 archive_dir="$temporary_root/archive"
 mkdir -p "$archive_dir"
-echo "data" > "$archive_dir/file.txt"
+echo "data" >"$archive_dir/file.txt"
 tar -czf "$temporary_root/test.tar.gz" -C "$archive_dir" .
 
 target_dir="$temporary_root/output"

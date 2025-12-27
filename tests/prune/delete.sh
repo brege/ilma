@@ -18,5 +18,5 @@ assert_exit 0
 
 remaining_count="$(find "$project_path" -name '*.pyc' | wc -l)"
 if [[ "$remaining_count" -ne 0 ]]; then
-    fail "Expected pyc files to be deleted, found $remaining_count"
+  fail "Expected pyc files to be deleted, found $remaining_count"
 fi

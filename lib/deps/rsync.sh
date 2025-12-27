@@ -3,75 +3,76 @@
 
 # Compute file hash
 compute_hash() {
-    local file="$1"
-    local algorithm="$2"
+  local file="$1"
+  local algorithm="$2"
 
-    case "$algorithm" in
-        sha256)
-            sha256sum "$file" | cut -d' ' -f1
-            ;;
-        sha1)
-            sha1sum "$file" | cut -d' ' -f1
-            ;;
-        md5)
-            md5sum "$file" | cut -d' ' -f1
-            ;;
-        *)
-            echo "Unknown hash algorithm: $algorithm" >&2
-            return 1
-            ;;
-    esac
+  case "$algorithm" in
+    sha256)
+      sha256sum "$file" | cut -d' ' -f1
+      ;;
+    sha1)
+      sha1sum "$file" | cut -d' ' -f1
+      ;;
+    md5)
+      md5sum "$file" | cut -d' ' -f1
+      ;;
+    *)
+      echo "Unknown hash algorithm: $algorithm" >&2
+      return 1
+      ;;
+  esac
 }
 
 # Sync file to remote server with verification
 sync_to_remote() {
-    local local_file="$1"
-    local remote_server="$2"
-    local remote_path="$3"
-    local hash_algorithm="$4"
-    local cleanup_after="${5:-false}"
-    local no_cleanup="${6:-false}"
+  local local_file="$1"
+  local remote_server="$2"
+  local remote_path="$3"
+  local hash_algorithm="$4"
+  local cleanup_after="${5:-false}"
+  local no_cleanup="${6:-false}"
 
-    echo "Computing local hash for verification..."
-    local local_hash
-    local_hash=$(compute_hash "$local_file" "$hash_algorithm")
-    if [[ $? -ne 0 ]]; then
-        echo "Failed to compute local hash"
-        return 1
-    fi
-    echo "Local $hash_algorithm: $local_hash"
+  echo "Computing local hash for verification..."
+  local local_hash
+  local_hash=$(compute_hash "$local_file" "$hash_algorithm")
+  if [[ $? -ne 0 ]]; then
+    echo "Failed to compute local hash"
+    return 1
+  fi
+  echo "Local $hash_algorithm: $local_hash"
 
-    echo "Syncing encrypted archive to remote server $remote_server:$remote_path..."
+  echo "Syncing encrypted archive to remote server $remote_server:$remote_path..."
 
-    # Use optimal rsync flags based on content type
-    local -a rsync_opts=()
-    ilma_append_rsync_preserve_args rsync_opts
-    rsync_opts+=(--partial --info=progress2)
-    local -a rsync_cmd=("rsync" "${rsync_opts[@]}")
-    local -a rsync_cmd_compress=("${rsync_cmd[@]}" "--compress")
-    if is_compressed_archive "$(basename "$local_file")" || [[ "$local_file" =~ \.zst\.gpg$ ]]; then
-        # Skip compression for already-compressed content
-        "${rsync_cmd[@]}" "$local_file" "${remote_server}:${remote_path}/"
-    else
-        # Use compression for uncompressed archives
-        "${rsync_cmd_compress[@]}" "$local_file" "${remote_server}:${remote_path}/"
-    fi
+  # Use optimal rsync flags based on content type
+  local -a rsync_opts=()
+  ilma_append_rsync_preserve_args rsync_opts
+  rsync_opts+=(--partial --info=progress2)
+  local -a rsync_cmd=("rsync" "${rsync_opts[@]}")
+  local -a rsync_cmd_compress=("${rsync_cmd[@]}" "--compress")
+  if is_compressed_archive "$(basename "$local_file")" || [[ "$local_file" =~ \.zst\.gpg$ ]]; then
+    # Skip compression for already-compressed content
+    "${rsync_cmd[@]}" "$local_file" "${remote_server}:${remote_path}/"
+  else
+    # Use compression for uncompressed archives
+    "${rsync_cmd_compress[@]}" "$local_file" "${remote_server}:${remote_path}/"
+  fi
 
-    if [[ $? -ne 0 ]]; then
-        echo "Remote sync failed."
-        return 1
-    fi
+  if [[ $? -ne 0 ]]; then
+    echo "Remote sync failed."
+    return 1
+  fi
 
-    echo "Remote sync successful."
+  echo "Remote sync successful."
 
-    # Verify remote file integrity
-    echo "Verifying remote file integrity..."
-    local remote_hash
-    local base_name
-    base_name="$(basename "$local_file")"
+  # Verify remote file integrity
+  echo "Verifying remote file integrity..."
+  local remote_hash
+  local base_name
+  base_name="$(basename "$local_file")"
 
-    # Build a robust remote command: cd to path, then compute hash with fallbacks
-    remote_hash=$(ssh "$remote_server" bash -s -- "$remote_path" "$base_name" "$hash_algorithm" << 'REMOTE_HASH_SH'
+  # Build a robust remote command: cd to path, then compute hash with fallbacks
+  remote_hash=$(
+    ssh "$remote_server" bash -s -- "$remote_path" "$base_name" "$hash_algorithm" <<'REMOTE_HASH_SH'
 set -e
 remote_path="$1"
 file="$2"
@@ -98,30 +99,29 @@ else
   exit 127
 fi
 REMOTE_HASH_SH
-)
+  )
 
+  if [[ -n "$remote_hash" && "$local_hash" == "$remote_hash" ]]; then
+    echo "✓ Hash verification successful - remote file integrity confirmed"
+    echo "Remote $hash_algorithm: $remote_hash"
 
-    if [[ -n "$remote_hash" && "$local_hash" == "$remote_hash" ]]; then
-        echo "✓ Hash verification successful - remote file integrity confirmed"
-        echo "Remote $hash_algorithm: $remote_hash"
-
-        # Cleanup local encrypted file if configured and not explicitly disabled
-        if [[ "$cleanup_after" == "true" && "$no_cleanup" != "true" ]]; then
-            echo "Removing local encrypted file..."
-            rm "$local_file"
-            if [[ $? -eq 0 ]]; then
-                echo "Local cleanup successful."
-            else
-                echo "Warning: Failed to remove local encrypted file."
-                return 1
-            fi
-        fi
-        return 0
-    else
-        echo "✗ Hash verification failed - remote file may be corrupted"
-        echo "Local:  $local_hash"
-        echo "Remote: ${remote_hash:-unavailable}"
-        echo "Keeping local encrypted file for safety."
+    # Cleanup local encrypted file if configured and not explicitly disabled
+    if [[ "$cleanup_after" == "true" && "$no_cleanup" != "true" ]]; then
+      echo "Removing local encrypted file..."
+      rm "$local_file"
+      if [[ $? -eq 0 ]]; then
+        echo "Local cleanup successful."
+      else
+        echo "Warning: Failed to remove local encrypted file."
         return 1
+      fi
     fi
+    return 0
+  else
+    echo "✗ Hash verification failed - remote file may be corrupted"
+    echo "Local:  $local_hash"
+    echo "Remote: ${remote_hash:-unavailable}"
+    echo "Keeping local encrypted file for safety."
+    return 1
+  fi
 }

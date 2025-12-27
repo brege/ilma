@@ -5,7 +5,7 @@ ILMA_DIR="$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")"
 COMMANDS_DIR="$ILMA_DIR/commands"
 
 show_main_help() {
-    cat <<EOF
+  cat <<EOF
 Usage: ilma [COMMAND] [OPTIONS] [PROJECT_PATH]
 
 COMMANDS:
@@ -26,29 +26,33 @@ EOF
 command="${1:-}"
 
 if [[ "$command" == "--help" || "$command" == "-h" ]]; then
-    show_main_help
-    exit 0
+  show_main_help
+  exit 0
 fi
 
 case "$command" in
-    backup|console|scan|prune|config|validate|decrypt|extract|remote|pull)
-        shift
-        ;;
-    *)
-        command="backup"
-        ;;
+  backup | console | scan | prune | config | validate | decrypt | extract | remote | pull)
+    shift
+    ;;
+  *)
+    command="backup"
+    ;;
 esac
 
 case "$command" in
-    backup) exec "$COMMANDS_DIR/backup.sh" "$@" ;;
-    console) exec "$COMMANDS_DIR/console.sh" "$@" ;;
-    scan) exec "$COMMANDS_DIR/scan.sh" "$@" ;;
-    prune) exec "$COMMANDS_DIR/prune.sh" "$@" ;;
-    config) exec "$COMMANDS_DIR/config.sh" "$@" ;;
-    validate) exec "$COMMANDS_DIR/validate.sh" "$@" ;;
-    decrypt) exec "$COMMANDS_DIR/decrypt.sh" "$@" ;;
-    extract) exec "$COMMANDS_DIR/extract.sh" "$@" ;;
-    remote) exec "$COMMANDS_DIR/remote.sh" remote "$@" ;;
-    pull) exec "$COMMANDS_DIR/remote.sh" pull "$@" ;;
-    *) echo "Error: Unknown command '$command'" >&2; show_main_help; exit 1 ;;
+  backup) exec "$COMMANDS_DIR/backup.sh" "$@" ;;
+  console) exec "$COMMANDS_DIR/console.sh" "$@" ;;
+  scan) exec "$COMMANDS_DIR/scan.sh" "$@" ;;
+  prune) exec "$COMMANDS_DIR/prune.sh" "$@" ;;
+  config) exec "$COMMANDS_DIR/config.sh" "$@" ;;
+  validate) exec "$COMMANDS_DIR/validate.sh" "$@" ;;
+  decrypt) exec "$COMMANDS_DIR/decrypt.sh" "$@" ;;
+  extract) exec "$COMMANDS_DIR/extract.sh" "$@" ;;
+  remote) exec "$COMMANDS_DIR/remote.sh" remote "$@" ;;
+  pull) exec "$COMMANDS_DIR/remote.sh" pull "$@" ;;
+  *)
+    echo "Error: Unknown command '$command'" >&2
+    show_main_help
+    exit 1
+    ;;
 esac

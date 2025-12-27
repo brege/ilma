@@ -13,7 +13,7 @@ BLUE='\033[0;34m'
 RESET='\033[0m'
 
 usage() {
-    cat <<EOF
+  cat <<EOF
 Usage: ilma validate [OPTIONS] [PROJECT_PATH]
 
 Validate ilma system components and configuration.
@@ -39,140 +39,167 @@ EOF
 }
 
 parse_validate_arguments() {
-    VALIDATION_MODE="basic"
-    PROJECT_ROOT="$(pwd)"
+  VALIDATION_MODE="basic"
+  PROJECT_ROOT="$(pwd)"
 
-    while [[ $# -gt 0 ]]; do
-        case $1 in
-            --dependencies) VALIDATION_MODE="dependencies"; shift ;;
-            --gpg) VALIDATION_MODE="gpg"; shift ;;
-            --compression) VALIDATION_MODE="compression"; shift ;;
-            --config) VALIDATION_MODE="config"; shift ;;
-            --paths) VALIDATION_MODE="paths"; shift ;;
-            --remote) VALIDATION_MODE="remote"; shift ;;
-            --basic) VALIDATION_MODE="basic"; shift ;;
-            --full) VALIDATION_MODE="full"; shift ;;
-            -h|--help) usage; exit 0 ;;
-            -*)
-                echo "Error: Unknown option $1" >&2
-                usage >&2
-                exit 1
-                ;;
-            *)
-                PROJECT_ROOT="$1"
-                shift
-                ;;
-        esac
-    done
+  while [[ $# -gt 0 ]]; do
+    case $1 in
+      --dependencies)
+        VALIDATION_MODE="dependencies"
+        shift
+        ;;
+      --gpg)
+        VALIDATION_MODE="gpg"
+        shift
+        ;;
+      --compression)
+        VALIDATION_MODE="compression"
+        shift
+        ;;
+      --config)
+        VALIDATION_MODE="config"
+        shift
+        ;;
+      --paths)
+        VALIDATION_MODE="paths"
+        shift
+        ;;
+      --remote)
+        VALIDATION_MODE="remote"
+        shift
+        ;;
+      --basic)
+        VALIDATION_MODE="basic"
+        shift
+        ;;
+      --full)
+        VALIDATION_MODE="full"
+        shift
+        ;;
+      -h | --help)
+        usage
+        exit 0
+        ;;
+      -*)
+        echo "Error: Unknown option $1" >&2
+        usage >&2
+        exit 1
+        ;;
+      *)
+        PROJECT_ROOT="$1"
+        shift
+        ;;
+    esac
+  done
 }
 
 format_output() {
-    while IFS= read -r line; do
-        case "$line" in
-            SECTION:*)
-                section="${line#SECTION:}"
-                echo -e "\n${BLUE}=== $section ===${RESET}"
-                ;;
-            PASS:*)
-                message="${line#PASS:}"
-                echo -e "${GREEN}✓${RESET} $message"
-                ;;
-            FAIL:*)
-                rest="${line#FAIL:}"
-                if [[ "$rest" == *:* ]]; then
-                    title="${rest%%:*}"
-                    error="${rest#*:}"
-                    echo -e "${RED}✗${RESET} $title"
-                    echo -e "  ${RED}Error:${RESET} $error"
-                else
-                    echo -e "${RED}✗${RESET} $rest"
-                fi
-                ;;
-            WARN:*)
-                rest="${line#WARN:}"
-                if [[ "$rest" == *:* ]]; then
-                    title="${rest%%:*}"
-                    warning="${rest#*:}"
-                    echo -e "${YELLOW}!${RESET} $title"
-                    echo -e "  ${YELLOW}Warning:${RESET} $warning"
-                else
-                    echo -e "${YELLOW}!${RESET} $rest"
-                fi
-                ;;
-            INFO:*)
-                message="${line#INFO:}"
-                echo -e "${BLUE}i${RESET} $message"
-                ;;
-            SUMMARY:PASS:*)
-                message="${line#SUMMARY:PASS:}"
-                echo -e "\n${GREEN}$message${RESET}"
-                ;;
-            SUMMARY:FAIL:*)
-                message="${line#SUMMARY:FAIL:}"
-                echo -e "\n${RED}$message${RESET}"
-                ;;
-        esac
-    done
+  while IFS= read -r line; do
+    case "$line" in
+      SECTION:*)
+        section="${line#SECTION:}"
+        echo -e "\n${BLUE}=== $section ===${RESET}"
+        ;;
+      PASS:*)
+        message="${line#PASS:}"
+        echo -e "${GREEN}✓${RESET} $message"
+        ;;
+      FAIL:*)
+        rest="${line#FAIL:}"
+        if [[ "$rest" == *:* ]]; then
+          title="${rest%%:*}"
+          error="${rest#*:}"
+          echo -e "${RED}✗${RESET} $title"
+          echo -e "  ${RED}Error:${RESET} $error"
+        else
+          echo -e "${RED}✗${RESET} $rest"
+        fi
+        ;;
+      WARN:*)
+        rest="${line#WARN:}"
+        if [[ "$rest" == *:* ]]; then
+          title="${rest%%:*}"
+          warning="${rest#*:}"
+          echo -e "${YELLOW}!${RESET} $title"
+          echo -e "  ${YELLOW}Warning:${RESET} $warning"
+        else
+          echo -e "${YELLOW}!${RESET} $rest"
+        fi
+        ;;
+      INFO:*)
+        message="${line#INFO:}"
+        echo -e "${BLUE}i${RESET} $message"
+        ;;
+      SUMMARY:PASS:*)
+        message="${line#SUMMARY:PASS:}"
+        echo -e "\n${GREEN}$message${RESET}"
+        ;;
+      SUMMARY:FAIL:*)
+        message="${line#SUMMARY:FAIL:}"
+        echo -e "\n${RED}$message${RESET}"
+        ;;
+    esac
+  done
 }
 
 validate_main() {
-    parse_validate_arguments "$@"
-    PROJECT_ROOT="$(require_project_root "$PROJECT_ROOT")"
+  parse_validate_arguments "$@"
+  PROJECT_ROOT="$(require_project_root "$PROJECT_ROOT")"
 
-    if [[ -f "$PROJECT_ROOT/.ilma.conf" ]]; then
-        source "$PROJECT_ROOT/.ilma.conf" 2>/dev/null || true
-    fi
+  if [[ -f "$PROJECT_ROOT/.ilma.conf" ]]; then
+    source "$PROJECT_ROOT/.ilma.conf" 2>/dev/null || true
+  fi
 
-    case "$VALIDATION_MODE" in
-        dependencies)
-            "$ILMA_DIR/lib/validation/dependencies.sh" | format_output
-            ;;
-        gpg)
-            GPG_KEY_ID="${GPG_KEY_ID:-}" "$ILMA_DIR/lib/validation/gpg.sh" | format_output
-            ;;
-        compression)
-            COMPRESSION_TYPE="${COMPRESSION_TYPE:-}" "$ILMA_DIR/lib/validation/compression.sh" | format_output
-            ;;
-        config)
-            "$ILMA_DIR/lib/validation/config.sh" "$PROJECT_ROOT" | format_output
-            ;;
-        paths)
-            "$ILMA_DIR/lib/validation/paths.sh" "$PROJECT_ROOT" | format_output
-            ;;
-        remote)
-            "$ILMA_DIR/lib/validation/remote.sh" "$PROJECT_ROOT" | format_output
-            "$ILMA_DIR/lib/validation/manifests.sh" | format_output
-            ;;
-        basic)
-            echo -e "${BLUE}ilma Configuration Validator${RESET}"
-            echo "Project: $PROJECT_ROOT"
-            echo "Validation level: basic"
+  case "$VALIDATION_MODE" in
+    dependencies)
+      "$ILMA_DIR/lib/validation/dependencies.sh" | format_output
+      ;;
+    gpg)
+      GPG_KEY_ID="${GPG_KEY_ID:-}" "$ILMA_DIR/lib/validation/gpg.sh" | format_output
+      ;;
+    compression)
+      COMPRESSION_TYPE="${COMPRESSION_TYPE:-}" "$ILMA_DIR/lib/validation/compression.sh" | format_output
+      ;;
+    config)
+      "$ILMA_DIR/lib/validation/config.sh" "$PROJECT_ROOT" | format_output
+      ;;
+    paths)
+      "$ILMA_DIR/lib/validation/paths.sh" "$PROJECT_ROOT" | format_output
+      ;;
+    remote)
+      "$ILMA_DIR/lib/validation/remote.sh" "$PROJECT_ROOT" | format_output
+      "$ILMA_DIR/lib/validation/manifests.sh" | format_output
+      ;;
+    basic)
+      echo -e "${BLUE}ilma Configuration Validator${RESET}"
+      echo "Project: $PROJECT_ROOT"
+      echo "Validation level: basic"
 
-            "$ILMA_DIR/lib/validation/config.sh" "$PROJECT_ROOT" | format_output
-            "$ILMA_DIR/lib/validation/paths.sh" "$PROJECT_ROOT" | format_output
-            COMPRESSION_TYPE="${COMPRESSION_TYPE:-}" "$ILMA_DIR/lib/validation/compression.sh" | format_output
-            GPG_KEY_ID="${GPG_KEY_ID:-}" "$ILMA_DIR/lib/validation/gpg.sh" | format_output
-            ;;
-        full)
-            echo -e "${BLUE}ilma Configuration Validator${RESET}"
-            echo "Project: $PROJECT_ROOT"
-            echo "Validation level: full"
+      "$ILMA_DIR/lib/validation/config.sh" "$PROJECT_ROOT" | format_output
+      "$ILMA_DIR/lib/validation/paths.sh" "$PROJECT_ROOT" | format_output
+      COMPRESSION_TYPE="${COMPRESSION_TYPE:-}" "$ILMA_DIR/lib/validation/compression.sh" | format_output
+      GPG_KEY_ID="${GPG_KEY_ID:-}" "$ILMA_DIR/lib/validation/gpg.sh" | format_output
+      ;;
+    full)
+      echo -e "${BLUE}ilma Configuration Validator${RESET}"
+      echo "Project: $PROJECT_ROOT"
+      echo "Validation level: full"
 
-            "$ILMA_DIR/lib/validation/config.sh" "$PROJECT_ROOT" | format_output
-            "$ILMA_DIR/lib/validation/paths.sh" "$PROJECT_ROOT" | format_output
-            COMPRESSION_TYPE="${COMPRESSION_TYPE:-}" "$ILMA_DIR/lib/validation/compression.sh" | format_output
-            GPG_KEY_ID="${GPG_KEY_ID:-}" "$ILMA_DIR/lib/validation/gpg.sh" | format_output
-            "$ILMA_DIR/lib/validation/remote.sh" "$PROJECT_ROOT" | format_output
-            "$ILMA_DIR/lib/validation/manifests.sh" | format_output
-            "$ILMA_DIR/lib/validation/dependencies.sh" | format_output
-            ;;
-        *)
-            echo "Error: Unknown validation mode '$VALIDATION_MODE'" >&2
-            exit 1
-            ;;
-    esac
+      "$ILMA_DIR/lib/validation/config.sh" "$PROJECT_ROOT" | format_output
+      "$ILMA_DIR/lib/validation/paths.sh" "$PROJECT_ROOT" | format_output
+      COMPRESSION_TYPE="${COMPRESSION_TYPE:-}" "$ILMA_DIR/lib/validation/compression.sh" | format_output
+      GPG_KEY_ID="${GPG_KEY_ID:-}" "$ILMA_DIR/lib/validation/gpg.sh" | format_output
+      "$ILMA_DIR/lib/validation/remote.sh" "$PROJECT_ROOT" | format_output
+      "$ILMA_DIR/lib/validation/manifests.sh" | format_output
+      "$ILMA_DIR/lib/validation/dependencies.sh" | format_output
+      ;;
+    *)
+      echo "Error: Unknown validation mode '$VALIDATION_MODE'" >&2
+      exit 1
+      ;;
+  esac
 }
 
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-    dispatch usage validate_main "$@"
+  dispatch usage validate_main "$@"
 fi
