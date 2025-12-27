@@ -1,88 +1,142 @@
-# changelog
+## Changelog
 
-recent development work on ilma backup/archive tool, roughly chronological
+### 2025-12-26
 
-## september 2025
+- Add --type flag to console command for project type statistics
+- Add TypeScript and ES module file types to Node.js schema
+- Warn when local .ilma.conf overrides --type flag
+- Reformat shell scripts with shfmt for consistency
+- Update pre-commit hooks to maintained repositories
 
-### 2025-09-22 verification + extraction hardening
-- Added `--verify` flag (and config defaults) to validate outputs:
-  - Archives: tar diff against source; with `--remote`, compare remote
-    hash to local.
-  - Encrypted archives: print local hash; with `--remote`, compare
-    remote vs local encrypted hash.
-  - Mirrors (-b/-c): rsync checksum dry-run to confirm integrity.
-- Safe extraction preflight: reject archives containing absolute paths
-  or `..` entries before extraction, and reorder logs so the "Safely
-  extracting" line appears only after preflight passes.
-- Remote hash verification helpers with BSD/macOS fallbacks (shasum /
-  openssl) using robust quoting/cd semantics.
-- Config: global `[verify] enabled = false` and per-project
-  `VERIFY=true` support; README examples updated.
-- ShellCheck and quoting fixes around archive naming and tar options.
+### 2025-12-12
 
-### 2025-09-06 short forms and multiple operations
-- added short flags: `-a` archive, `-b` backup, `-c` context, `-e` encrypt, `-r` remote
-- multi-operation support: `ilma -aec` creates archive, context, and encrypted versions in one run
-- fixed regression: validate command args broken (`--dependencies`, `--gpg`, `--compression`)
-- timestamp/numbered duplication handling restored for .bak files
-- rsync output cleanup (removed verbose itemization spam)
+- Fix scan/prune clause building
+- Improve verbose labels in template output
+- Remove --context backups from backup options
+- Refactor command harness extraction
 
-### 2025-09-06 single file support
-- single file backup: `file.txt` -> `file.txt.bak` (or numbered/timestamped)
-- single file encryption: `file.txt` -> `file.txt.gpg`
-- handles pre-archived files: `project.tar.zst` -> `project.tar.zst.gpg`
-- `--target` flag added for custom output directories (replaces `--outdir`)
+### 2025-12-11
 
-### 2025-09-06 multi-origin archives
-- multiple path arguments: `ilma -a dir1/ dir2/ dir3/`
-- creates single archive from multiple sources with timestamp naming
-- works with encryption: `ilma -ae path1 path2`
-- proper source listing in output
-- fixed bug where only first path was processed
+- Ensure context mirror generation works with known types
+- Fix context mirror generation to create as sibling directory
+- Add defensive null project root handling
+- Add GitHub Actions test workflow
+- Add comprehensive test suite and unit tests
+- Add smoke test ensemble
 
-### 2025-09-06 custom naming and targeting
-- `--basename NAME` for custom output filenames
-- combines with `--target`: `--target /path --basename myfile` -> `/path/myfile.tar.zst`
-- works across all mirror types (-a, -b, -c, -e)
-- replaces auto-generated timestamps when specified
+### 2025-12-09
 
-### 2025-09-07 pipeline encryption
-- direct tar -> gpg pipeline eliminates temp files in `/tmp`
-- removes intermediate disk i/o for encryption
-- maintains all logic for exclusions and multi-origin support
+- Document future refactoring plans
 
-### 2025-09-12 scan and prune improvements
-- multi-type support: `--type all`, repeated flags, pipe-separated lists
-- pattern-based operations: `--pattern "*.log"` independent of project type
-- strict argument order enforcement: `ilma COMMAND [OPTIONS] [PATH]`
-- prune verbose output with size summaries
-- safety: excludes .git and vcs paths from deletion
+### 2025-12-05
 
-### 2025-09-12 filesystem optimizations
-- smart copy detection for local mirrors
-- filesystem-aware performance: btrfs reflinks, ext4 optimizations
-- benchmark results show 3-8x speedup over rsync for local copies
-- fallback to rsync for remote/cross-filesystem operations
-- affects backup mirrors, not context mirrors
+- Update help text
 
-## implementation notes
+### 2025-11-22
 
-completed regressions fixes:
-- timestamp/mirror duplication handling
-- validate command argument parsing
-- rsync output cleanup
+- Centralize tar options configuration
 
-completed core functionality:
-- short form flags (-abcer)
-- multiple mirror operations in single command
-- single file backup and encryption
-- multi-origin archive creation
-- custom output naming and targeting
-- temp-file-free encryption pipeline
-- filesystem detection and optimization
+### 2025-11-13
 
-pending work:
-- trash method for prune with restoration
-- statistics summary for file extensions
-- absolute vs relative mirror path configuration
-- commutative remote flag with other operations
+- Add --timestamp flag for retroactive and override file touches
+- Install only changed components on update
+
+### 2025-11-09
+
+- Improve messaging for install process
+
+### 2025-11-06
+
+- Add install script for system-wide deployment
+
+### 2025-10-30
+
+- Refine rsync arguments for safer, less verbose output
+
+### 2025-10-25
+
+- Adopt XDG config location with lookup order precedence
+- Combine filter rules and jobs into single device manifest
+
+### 2025-10-09
+
+- Simplify .ilma.conf prefix syntax
+- Implement remote pulling from manifests
+
+### 2025-09-24
+
+- Ensure --remote respects timestamps in basenames
+
+### 2025-09-22
+
+- Add --verify flag for archive and encryption integrity validation
+- Add pre-flight checks for tar extraction (reject absolute paths and .. entries)
+- Add configurable naming, deduped paths, and GPG polish
+- Add remote hash verification with BSD/macOS fallbacks
+- Support per-project VERIFY configuration
+- Add socket and symlink guards in cleanup operations
+
+### 2025-09-18
+
+- Repair multi-target regression
+- Add initial changelog
+
+### 2025-09-12
+
+- Add filesystem detection for local mirror optimization
+- Restore mirror progress reporting and compression statistics
+- Add multi-type and pattern support to scan and prune commands
+- Add safety improvements (exclude .git and VCS paths from deletion)
+
+### 2025-09-07
+
+- Implement tar to GPG pipeline to eliminate temporary files
+
+### 2025-09-06
+
+- Add short flags (-a, -b, -c, -e, -r)
+- Implement single file backup and encryption
+- Implement multi-origin archive creation from multiple paths
+- Add --basename for custom output filenames
+- Add --target for custom output directories
+- Clean up rsync output verbosity
+- Fix multi-origin argument handling
+
+### 2025-09-04
+
+- Reorganize utilities and improve help texts
+
+### 2025-09-03
+
+- Merge duplicate validation logic
+- Reorganize scripts with explicit --backup flag
+
+### 2025-09-02
+
+- Partition backup and extraction methods
+- Add system and config validation with smoketests
+
+### 2025-09-01
+
+- Partition compression, GPG, rsync, extract, and decrypt into modular dependencies
+- Implement standalone archival with GPG encryption and rsync support
+- Improve atomic configuration with --type inheritance
+
+### 2025-08-30
+
+- Implement prune command for removing project build artifacts
+- Add filesystem cruft scanning
+- Ensure console stat consistency
+- Add comprehensive help system
+- Add trailing whitespace removal to pre-commit hooks
+
+### 2025-08-29
+
+- Modularize ilma into orchestrator architecture
+- Resolve target location bugs in core archival
+- Add project management utilities
+- Add GPLv3 license
+
+### 2025-08-23
+
+- Initial commit
