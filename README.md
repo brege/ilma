@@ -1,20 +1,20 @@
 # ilma
 
-A project backup and archival tool with selective project-type awareness, pruning, encryption, and remote synchronization.
+A project backup and archival tool for pullable snapshots, portable archives, encryption, and remote collection.
 
 ## Features
 
 - **Project-Type Awareness**
 
-  Automatic detection and application of appropriate exclusions for Python, Node.js, LaTeX, Bash projects, with extensibility for any project with build and runtime artifacts.
+  Apply exclusion presets for Python, Node.js, LaTeX, Bash, and similar projects when creating archives or encrypted snapshots.
 
 - **Standard GPG, tar, and rsync core with ergonomic CLI**
 
-  GPG encryption for secure transport and storage. Create context mirrors of projects (working tree without git artifacts, node\_modules, build outputs) for LLM interaction or quick archival
+  Build portable `tar` archives, encrypt them with GPG, and send them to remote storage with `rsync`.
 
-- **Prune per-project build artifacts on archival**
+- **Remote Pull Jobs**
 
-  Can be easily configured to automatically remove disposable files and directories based on a per-project or recursive cleanup task, logging events and creating backups for recovery.
+  Pull selected files from remote machines by manifest, stage them locally, and archive or encrypt the result.
 
 ## Usage
 
@@ -47,18 +47,6 @@ A project backup and archival tool with selective project-type awareness, prunin
 
 ### More Examples
 
-**Prune crufty project files**
-
-All the disposable files and directories can be easily removed with the `prune` command,
-based on project type or project-local configuration files.
-
-```bash
-ilma prune ~/dissertation \
-    --type latex \         # remove build artifacts .aux, .toc, etc
-    --log \                # log to ~/dissertation.log
-    --bak                  # backup to ~/dissertation.bak
-```
-
 **Send encrypted archive to remote server**
 ```bash
 ilma --encrypt \
@@ -75,11 +63,8 @@ ssh server.local ls /storage/backups
 ilma validate
 
 ```
-**Context Overview**  
-Generate a token estimate of project context before and after pruning
-```bash
-ilma console --type [node|python|latex|bash]
-```
+**Project litter review**  
+**ilma** no longer owns project litter review. This component has been ported to [**dil**](https://github.com/brege/dil), in Python, for disposable artifact detection and deletion.
 
 ## Installation
 
@@ -157,20 +142,9 @@ ilma -a --verify                 # Archive and verify contents
 ilma -e --verify --remote srv:/dst  # Encrypt, upload, and verify remote hash
 ```
 
-### Analysis & Statistics
-
-Create context mirrors for LLM interaction by excluding git history, build artifacts, and dependency directories. Snapshots current working state including uncommitted and untracked files without git ceremony.
-
-```bash
-ilma console [PROJECT_PATH]      # Show detailed project statistics
-ilma scan [PROJECT_PATH]         # Show files that would be excluded
-ilma scan --type python --pretty # Scan with specific project type
-```
-
 ### Validation & Troubleshooting
 
-After customizing your configuration, you can validate your setup
-quickly without trial-and-error on your data.
+After customizing your configuration, you can validate your setup quickly without trial-and-error on your data.
 
 ```bash
 ilma validate                    # Basic configuration validation
@@ -200,7 +174,7 @@ ilma decrypt file.tar.zst.gpg    # Decrypts and decompresses in one pass
 
 ## What ilma is and is not
 
-**ilma** is an over-engineered wrapper. It is intended to backup irreplaceable things like configs, databases, pictures, presentations, etc on the go. I use **ilma** to quickly create archives from local and remote work, take them on the go securely, and recover them when needed. Often, I run `ilma -a .git` when I know I may mess something up in the Git tree or before performing a dangerous find+sed+{} on a codebase (the archive protects string replacements affecting `.git/` files).
+**ilma** is a shell wrapper around common file-handling tools. It is meant to create local or pulled snapshots that can be archived, encrypted, moved, and recovered without needing a custom repository format.
 
 **ilma** is **NOT** intended to be a deduplication or synchronization tool.
 These tools offer better coverage for those tasks:
@@ -208,7 +182,7 @@ These tools offer better coverage for those tasks:
 - Recommended encrypted, deduplicated backups: [**restic**](https://restic.net/)
 - Recommended synchronization tool: [**syncthing**](https://syncthing.net/)
 
-Because **ilma** is written as a shell wrapper for common file-handling tools, `ilma`-generated files are completely recoverable without needing ilma. Restic requires restic for recovery. Syncthing is synchronous, and opaque in the only place you get encryption: "untrusted device" mode.
+Because **ilma** is written as a shell wrapper for common file-handling tools, `ilma`-generated files are recoverable without needing `ilma` itself. Restic requires restic for recovery. Syncthing is synchronous, and opaque in the only place you get encryption: "untrusted device" mode.
 
 **ilma** works in addition to restic and syncthing for a complementary purpose. Restic efficiently backs up entire home directories with deduplication and versioning. Syncthing maintains synchronized state across devices. ilma can be used to create encrypted project snapshots for transport to untrusted storage.
 
@@ -250,5 +224,3 @@ Restic doesn't work in this direction. Most people do not run an SSH server on t
 ## License
 
 [GPLv3](https://www.gnu.org/licenses/gpl-3.0.en.html)
-
-

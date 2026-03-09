@@ -1,5 +1,11 @@
 ## Changelog
 
+### 2026-03-09
+
+- Remove console, scan, and prune from ilma
+- Move project litter review into dil
+- Narrow ilma back to backup, archive, encrypt, extract, and remote pull
+
 ### 2025-12-26
 
 - Add --type flag to console command for project type statistics

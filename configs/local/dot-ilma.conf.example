@@ -38,22 +38,6 @@ RSYNC_EXCLUDES=(
 )
 
 # =============================================================================
-# STATISTICS SCOPE (for 'ilma console' command only)
-# =============================================================================
-
-# File extensions to analyze for project statistics
-# NOTE: This ONLY affects console output, NOT what gets backed up
-EXTENSIONS=(
-     md
-#    js ts tsx jsx
-#    py
-#    md txt
-#    json yaml yml
-#    sh bash
-    # Add more extensions for better console statistics
-)
-
-# =============================================================================
 # DESTINATION CONFIGURATION - All backup/archive/sync targets
 # =============================================================================
 

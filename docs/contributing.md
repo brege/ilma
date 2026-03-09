@@ -1,8 +1,6 @@
 # Contributing
 
-This reference shows each command using the `ilma` entrypoint and the direct
-`bash commands/<command>.sh` entrypoint. Examples assume you are in the
-repository root and you have run the sandbox setup.
+This reference shows each supported command using the `ilma` entrypoint and the direct `bash commands/<command>.sh` entrypoint. Examples assume you are in the repository root and you have run the sandbox setup.
 
 ## Sandbox
 
@@ -32,65 +30,7 @@ ilma config "$DUMMIES/dummy-project-js"
 bash commands/config.sh "$DUMMIES/dummy-project-js"
 ```
 
-### console
-Generate file counts, line counts, and a token estimate for a project.
-```bash
-ilma console "$DUMMIES/dummy-project-python" --type python
-bash commands/console.sh "$DUMMIES/dummy-project-python" --type python
-```
-
-Example output:
-```
-Project Statistics
-------------------
-Metric                  Count
------                   -----
-Total files                52
-.py files                   2
-.md files                   2
-.txt files                  1
-.json files                 1
-Total lines                73
-.py lines                  10
-.md lines                  10
-.txt lines                  3
-.json lines                 1
-Total size (MB)             1
-------------------
-Source token estimate: 314 (~4 chars per token)
-```
-Ignores: common Python build artifacts defined in `configs/projects/python.ilma.conf`.
-
-### scan
-Show which files would be pruned for a given project type (dry-run).
-```bash
-ilma scan "$DUMMIES/dummy-project-python" --type python --pretty
-bash commands/scan.sh "$DUMMIES/dummy-project-python" --type python --pretty
-```
-
-Example output:
-```
-Skip analysis for type 'python' in directory: /tmp/ilma-dummies/dummy-project-python
-Dry run mode: no files will be deleted
-
-Project directory: /tmp/ilma-dummies/dummy-project-python
-  WOULD DELETE:
-    /tmp/ilma-dummies/dummy-project-python/__pycache__/
-    /tmp/ilma-dummies/dummy-project-python/src/__pycache__/
-    /tmp/ilma-dummies/dummy-project-python/.pytest_cache/
-    /tmp/ilma-dummies/dummy-project-python/venv/
-    /tmp/ilma-dummies/dummy-project-python/dist/
-    /tmp/ilma-dummies/dummy-project-python/build/
-
-Dry run complete: no files deleted
-```
-
-### prune
-Run the prune analysis without deleting files (add `--verbose` to list paths).
-```bash
-ilma prune "$DUMMIES/dummy-project-python" --type python
-bash commands/prune.sh "$DUMMIES/dummy-project-python" --type python
-```
+Project litter review was split out of `ilma` into [**dil**](https://github.com/brege/dil). This repository now only documents the archival, extraction, validation, and remote pull surfaces that remain in `ilma`.
 
 ### validate
 Check configuration and dependency state for a project.
@@ -114,8 +54,7 @@ bash commands/decrypt.sh --help
 ```
 
 ### remote
-List discovered remote job manifests. This creates a local manifest so the list
-command has something to display.
+List discovered remote job manifests. This creates a local manifest so the list command has something to display.
 ```bash
 export ILMA_CONFIG_HOME="$DUMMIES/ilma-config"
 mkdir -p "$ILMA_CONFIG_HOME/nodes"
@@ -140,8 +79,7 @@ bash commands/remote.sh pull --help
 
 ## Testing
 
-Run the full suite with `tests/run.sh`. Each test is a bash script under `tests/`,
-excluding `tests/helpers`.
+Run the full suite with `tests/run.sh`. Each test is a bash script under `tests/`, excluding `tests/helpers`.
 ```bash
 tests/run.sh
 ```
@@ -152,5 +90,4 @@ Linting is managed by pre-commit. If you have it installed, run:
 ```bash
 pre-commit run --all-files
 ```
-The hooks run `shfmt` and `shellcheck`; the versions and arguments live in
-`.pre-commit-config.yaml`.
+The hooks run `shfmt` and `shellcheck`; the versions and arguments live in `.pre-commit-config.yaml`.

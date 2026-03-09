@@ -67,7 +67,6 @@ load_config() {
   VERSIONING="timestamp"
   ARCHIVE_VERSIONING="timestamp"
   ENCRYPT_VERSIONING="timestamp"
-  EXTENSIONS=(md txt)
   RSYNC_EXCLUDES=()
   COMPRESSION_TYPE="zstd"
   COMPRESSION_LEVEL="3"
@@ -227,7 +226,6 @@ show_config() {
     echo "  VERSIONING   = $VERSIONING"
     echo "  ARCHIVE_VERSIONING = $ARCHIVE_VERSIONING"
     echo "  ENCRYPT_VERSIONING = $ENCRYPT_VERSIONING"
-    echo "  EXTENSIONS               = (${EXTENSIONS[*]})"
   else
     local fallback_archive_dir
     if [[ -n "$ARCHIVE_BASE_DIR" ]]; then

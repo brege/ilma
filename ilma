@@ -10,9 +10,6 @@ Usage: ilma [COMMAND] [OPTIONS] [PROJECT_PATH]
 
 COMMANDS:
   backup       Create backup (default)
-  console      Show project statistics
-  scan         Scan project files and detect junk
-  prune        Dry-run analysis of files to clean (no deletion)
   config       Show configuration details
   validate     Validate configuration and connectivity
   decrypt      Decrypt GPG-encrypted archive
@@ -31,7 +28,7 @@ if [[ "$command" == "--help" || "$command" == "-h" ]]; then
 fi
 
 case "$command" in
-  backup | console | scan | prune | config | validate | decrypt | extract | remote | pull)
+  backup | config | validate | decrypt | extract | remote | pull)
     shift
     ;;
   *)
@@ -41,9 +38,6 @@ esac
 
 case "$command" in
   backup) exec "$COMMANDS_DIR/backup.sh" "$@" ;;
-  console) exec "$COMMANDS_DIR/console.sh" "$@" ;;
-  scan) exec "$COMMANDS_DIR/scan.sh" "$@" ;;
-  prune) exec "$COMMANDS_DIR/prune.sh" "$@" ;;
   config) exec "$COMMANDS_DIR/config.sh" "$@" ;;
   validate) exec "$COMMANDS_DIR/validate.sh" "$@" ;;
   decrypt) exec "$COMMANDS_DIR/decrypt.sh" "$@" ;;
