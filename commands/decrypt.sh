@@ -20,7 +20,7 @@ Decrypt a GPG-encrypted file and optionally extract if it is an archive.
 
 OPTIONS:
   --no-extract       Decrypt only, do not extract archive
-  --force            Replace existing target directory when extracting
+  -f, --force        Replace existing target directory when extracting
   --target DIR       Extract to specific directory instead of derived name
   -h, --help         Show this help message
 EOF
@@ -34,12 +34,12 @@ parse_decrypt_arguments() {
 
   while (($# > 0)); do
     case "$1" in
-      --no-extract)
-        no_extract_option=true
+      -f | --force)
+        force_option=true
         shift
         ;;
-      --force)
-        force_option=true
+      --no-extract)
+        no_extract_option=true
         shift
         ;;
       --target)

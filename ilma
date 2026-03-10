@@ -21,7 +21,7 @@ Unpack:
 
 Other commands:
   backup       Create backup (default)
-  config       Show resolved configuration
+  -c, config   Show resolved configuration
   validate     Validate config, dependencies, and connectivity
   decrypt      Decrypt GPG-encrypted archive
   extract      Safely extract archive (prevents tarbombs)
@@ -39,6 +39,10 @@ if [[ "$command" == "--help" || "$command" == "-h" ]]; then
 fi
 
 case "$command" in
+  -c | --config)
+    shift
+    exec "$COMMANDS_DIR/config.sh" "$@"
+    ;;
   -d | --decrypt)
     shift
     exec "$COMMANDS_DIR/decrypt.sh" "$@"

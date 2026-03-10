@@ -18,7 +18,7 @@ Usage: ilma extract [OPTIONS] <archive_file> [TARGET_DIR]
 Safely extract archive to a contained directory (prevents tarbombs).
 
 OPTIONS:
-  --force            Replace existing target directory
+  -f, --force        Replace existing target directory
   --target DIR       Extract to specific directory instead of derived name
   -h, --help         Show this help message
 EOF
@@ -32,7 +32,7 @@ parse_extract_arguments() {
 
   while (($# > 0)); do
     case "$1" in
-      --force)
+      -f | --force)
         force_option=true
         shift
         ;;

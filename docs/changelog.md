@@ -5,6 +5,9 @@
 - Remove console, scan, and prune from ilma
 - Move project litter review into dil
 - Narrow ilma back to backup, archive, encrypt, extract, and remote pull
+- Add `-d` and `-x` as top-level aliases for decrypt and extract
+- Add `-c` as a top-level alias for config
+- Add `-f` as a short alias for force in decrypt and extract
 
 ### 2025-12-26
 

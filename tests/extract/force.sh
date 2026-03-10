@@ -17,6 +17,6 @@ tar -czf "$temporary_root/test.tar.gz" -C "$archive_dir" .
 target_dir="$temporary_root/output"
 mkdir -p "$target_dir"
 
-run_command --workdir "$repository_root" "$repository_root/commands/decrypt.sh" --force --target "$target_dir" "$temporary_root/test.tar.gz"
+run_command --workdir "$repository_root" "$repository_root/commands/decrypt.sh" -f --target "$target_dir" "$temporary_root/test.tar.gz"
 assert_exit 0
 assert_file_exists "$target_dir"
