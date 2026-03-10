@@ -9,6 +9,12 @@ repository_root="$(cd "$script_directory/../.." && pwd)"
 
 run_command --workdir "$repository_root" "$repository_root/ilma" --help
 assert_exit 0
-assert_contains "$COMMAND_STDOUT" "Usage: ilma [COMMAND]"
+assert_contains "$COMMAND_STDOUT" "Usage: ilma [OPTIONS] [PROJECT_PATH]"
+assert_contains "$COMMAND_STDOUT" "Pack:"
+assert_contains "$COMMAND_STDOUT" "Decrypt and optionally extract archive"
 assert_contains "$COMMAND_STDOUT" "backup"
+assert_contains "$COMMAND_STDOUT" "config"
+assert_contains "$COMMAND_STDOUT" "validate"
+assert_contains "$COMMAND_STDOUT" "decrypt"
+assert_contains "$COMMAND_STDOUT" "extract"
 assert_contains "$COMMAND_STDOUT" "remote pull"

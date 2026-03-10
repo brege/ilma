@@ -6,17 +6,28 @@ COMMANDS_DIR="$ILMA_DIR/commands"
 
 show_main_help() {
   cat <<EOF
-Usage: ilma [COMMAND] [OPTIONS] [PROJECT_PATH]
+Usage: ilma [OPTIONS] [PROJECT_PATH]
+       ilma [COMMAND] [OPTIONS]
 
-COMMANDS:
+Pack:
+  -b, --backup                Create backup directory
+  -a, --archive               Create compressed archive
+  -e, --encrypt               Create encrypted archive
+  -r, --remote SERVER:/PATH   Sync directly to remote server
+
+Unpack:
+  -d, --decrypt               Decrypt and optionally extract archive
+  -x, --extract               Safely extract archive
+
+Other commands:
   backup       Create backup (default)
-  config       Show configuration details
-  validate     Validate configuration and connectivity
+  config       Show resolved configuration
+  validate     Validate config, dependencies, and connectivity
   decrypt      Decrypt GPG-encrypted archive
   extract      Safely extract archive (prevents tarbombs)
-  remote pull  Run remote pull jobs
+  remote pull  Run remote pull jobs from node manifests
 
-Run "ilma COMMAND --help" for command-specific options.
+Run "ilma backup --help" or "ilma COMMAND --help" for details.
 EOF
 }
 
@@ -28,6 +39,14 @@ if [[ "$command" == "--help" || "$command" == "-h" ]]; then
 fi
 
 case "$command" in
+  -d | --decrypt)
+    shift
+    exec "$COMMANDS_DIR/decrypt.sh" "$@"
+    ;;
+  -x | --extract)
+    shift
+    exec "$COMMANDS_DIR/extract.sh" "$@"
+    ;;
   backup | config | validate | decrypt | extract | remote | pull)
     shift
     ;;

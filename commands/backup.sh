@@ -32,7 +32,7 @@ positional_arguments=()
 
 backup_usage() {
   cat <<'EOF'
-Usage: backup.sh [OPTIONS] [PROJECT_PATH] [ADDITIONAL_PATHS...]
+Usage: ilma backup [OPTIONS] [PROJECT_PATH] [ADDITIONAL_PATHS...]
 
 Create backups, archives, and encrypted archives for a project.
 
