@@ -4,9 +4,9 @@ A project backup and archival tool for pullable snapshots, portable archives, en
 
 ## Features
 
-- **Project-Type Awareness**
+- **Explicit filter control**
 
-  Apply exclusion presets for Python, Node.js, LaTeX, Bash, and similar projects when creating archives or encrypted snapshots.
+  Use per-project `RSYNC_EXCLUDES` or remote job manifests to decide exactly what gets staged, archived, encrypted, or transferred.
 
 - **Standard GPG, tar, and rsync core with ergonomic CLI**
 
@@ -29,7 +29,7 @@ A project backup and archival tool for pullable snapshots, portable archives, en
    ```bash
    cd my-project
    ilma -a  # archive
-   tree -L1 ..
+   ls -1 ..
    ..
    ├── my-project
    └── my-project.tar.zst
@@ -39,7 +39,7 @@ A project backup and archival tool for pullable snapshots, portable archives, en
 
    ```bash
    ilma -e ~/Documents/love-letters/
-   tree -L1 ~/Documents
+   ls -1 ~/Documents
    ~/Documents
    ├── love-letters
    └── love-letters.tar.zst.gpg
@@ -51,7 +51,6 @@ A project backup and archival tool for pullable snapshots, portable archives, en
 ```bash
 ilma --encrypt \
      --remote server.local:/storage/backups \
-     --type latex \
      ~/dissertation
 
 ssh server.local ls /storage/backups
@@ -77,14 +76,14 @@ cd ilma
 
 Fedora dependencies
 ```bash
-sudo dnf install rsync tree git zstd bc pv
+sudo dnf install rsync git zstd bc pv
 # compression tools (configure: you only need one)
 sudo dnf install zstd gzip bzip2 xz
 ```
 
 Debian/Ubuntu dependencies
 ```bash
-sudo apt install rsync tree git zstd bc pv
+sudo apt install rsync git zstd bc pv
 sudo apt install zstd gzip bzip2 xz-utils
 ```
 
@@ -116,18 +115,7 @@ cp config.example.ini config.ini
 #### Per-Project
 
 Create **`.ilma.conf`** in any project for custom strategies.
-See **[`configs/local/dot-ilma.conf.example`](./configs/local/dot-ilma.conf.example)** for a kitchen sink example.
-
----
-
-| Supported Project Types | Common Exclusions               |
-|:-----------|:---------------------------------------------|
-| **python** | `__pycache__`, `venv`, `.pytest_cache`, etc. |
-| **node**   | `node_modules`, `dist`, `build`, etc.        |
-| **latex**  | `.aux`, `.log`, `.pdf`, etc.                 |
-| **bash**   | `.log`, `.tmp`, `.out`, backup files, etc.   |
-
-See **[`configs/`](./configs)** for common language presets.
+See **[`dot-ilma.conf.example`](./dot-ilma.conf.example)** for a compact example.
 
 ---
 

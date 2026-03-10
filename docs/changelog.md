@@ -5,6 +5,8 @@
 - Remove console, scan, and prune from ilma
 - Move project litter review into dil
 - Narrow ilma back to backup, archive, encrypt, extract, and remote pull
+- Remove project type presets and `--type` inheritance from backup/config flow
+- Flatten the remaining local config example to `dot-ilma.conf.example` at repo root
 - Add `-d` and `-x` as top-level aliases for decrypt and extract
 - Add `-c` as a top-level alias for config
 - Add `-f` as a short alias for force in decrypt and extract

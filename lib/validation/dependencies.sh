@@ -15,7 +15,6 @@ required_tools=(
 # Optional tools
 optional_tools=(
   "gpg:File encryption and decryption"
-  "tree:Directory structure visualization in output"
   "xz:High compression ratio algorithm"
   "pv:Progress visualization for large operations"
   "zstd:Fast compression algorithm"

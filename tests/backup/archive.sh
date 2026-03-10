@@ -13,7 +13,7 @@ run_command --workdir "$repository_root" "$repository_root/tools/make-dummies.sh
 assert_exit 0
 
 project_path="$temporary_root/dummy-project-python"
-run_command --workdir "$repository_root" "$repository_root/ilma" --archive "$project_path" --type python
+run_command --workdir "$repository_root" "$repository_root/ilma" --archive "$project_path"
 assert_exit 0
 
 archive_path="$(find "$temporary_root" -maxdepth 1 -type f -name 'dummy-project-python*.tar*' | head -n 1)"

@@ -22,7 +22,6 @@ archive_output=""
 encrypt_requested=false
 encrypt_output=""
 remote_target=""
-type_name=""
 target_directory=""
 custom_basename=""
 verify_option=""
@@ -41,7 +40,6 @@ OPTIONS:
   -a, --archive [OUTPUT_PATH]    Create compressed archive only
   -e, --encrypt [OUTPUT_PATH]    Create encrypted archive only
   -r, --remote SERVER:/PATH      Sync directly to remote server
-  --type TYPE                    Project type configuration
   --target DIR                   Output directory for generated artifacts
   --basename NAME                Custom base filename for archives
   --verify                       Verify outputs (archives)
@@ -150,7 +148,6 @@ parse_backup_arguments() {
   encrypt_requested=false
   encrypt_output=""
   remote_target=""
-  type_name=""
   target_directory=""
   custom_basename=""
   verify_option=""
@@ -223,18 +220,6 @@ parse_backup_arguments() {
           exit 1
         fi
         remote_target="$2"
-        shift 2
-        ;;
-      --type)
-        if [[ -z "${2:-}" ]]; then
-          echo "Error: --type requires an argument" >&2
-          exit 1
-        fi
-        if [[ -n "$type_name" ]]; then
-          type_name="${type_name}|${2}"
-        else
-          type_name="$2"
-        fi
         shift 2
         ;;
       --verify)
@@ -345,7 +330,7 @@ backup_main() {
       local single_file_path="$project_root"
       project_root="$(dirname "$project_root")"
 
-      load_config "$project_root" "$type_name"
+      load_config "$project_root"
       if [[ -z "$verify_option" ]]; then
         if [[ "${VERIFY:-}" == "true" || "${VERIFY_DEFAULT:-false}" == "true" ]]; then
           verify_option="true"
@@ -373,7 +358,7 @@ backup_main() {
     exit 1
   fi
 
-  load_config "$project_root" "$type_name"
+  load_config "$project_root"
 
   if [[ -z "$verify_option" ]]; then
     if [[ "${VERIFY:-}" == "true" || "${VERIFY_DEFAULT:-false}" == "true" ]]; then

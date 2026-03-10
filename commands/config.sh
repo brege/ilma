@@ -6,7 +6,6 @@ initialize_paths
 
 source "$ILMA_DIR/lib/configs.sh"
 
-type_name=""
 project_path=""
 
 # Load INI configuration file
@@ -57,7 +56,6 @@ load_ini_config() {
 
 load_config() {
   local project_root="$1"
-  local type="${2:-}"
 
   # Set default configuration variables
   BACKUP_BASE_DIR=""
@@ -86,41 +84,9 @@ load_config() {
     CONFIG_FOUND=true
   fi
 
-  # Load type-specific config if specified (for archive creation only)
-  TYPE_CONFIG_LOADED=false
-  if [[ -n "$type" ]]; then
-    local type_config=""
-    if type_config="$(resolve_ilma_type_config "$type")"; then
-      source "$type_config"
-      TYPE_CONFIG_LOADED=true
-    else
-      echo "Warning: Configuration type '$type' not found, using defaults" >&2
-    fi
-  fi
-
   # Load project-local configuration (enables full pipeline)
   if [[ -f "$project_root/.ilma.conf" ]]; then
-    # Warn if --type was specified but will be overridden by local config
-    if [[ -n "$type" ]]; then
-      echo "Warning: Local .ilma.conf found; ignoring --type $type" >&2
-    fi
-
-    # First pass: check if PROJECT_TYPE is specified
-    PROJECT_TYPE=""
     source "$project_root/.ilma.conf"
-
-    # If PROJECT_TYPE is set, load that type config first
-    if [[ -n "$PROJECT_TYPE" ]]; then
-      local type_config=""
-      if type_config="$(resolve_ilma_type_config "$PROJECT_TYPE")"; then
-        source "$type_config"
-      else
-        echo "Warning: PROJECT_TYPE '$PROJECT_TYPE' not found in configured project directories" >&2
-      fi
-
-      # Second pass: re-source local config for overrides/appends
-      source "$project_root/.ilma.conf"
-    fi
 
     CONFIG_FOUND=true
   fi
@@ -139,27 +105,19 @@ handle_special_modes() {
     CONFIG_FOUND="false" # Skip normal workflow
     echo "Archive mode: creating complete image at $archive_flag"
   elif [[ "$CONFIG_FOUND" == "false" ]]; then
-    # Fallback/type-only mode: if no local config found, create simple archive in current directory
-    # Keep type-specific exclusions if type config was loaded, otherwise use safe defaults
-    if [[ "$TYPE_CONFIG_LOADED" == "false" ]]; then
-      # SAFETY: Always exclude critical directories even in fallback mode
-      RSYNC_EXCLUDES=(
-        --exclude '.svn/'
-        --exclude '.hg/'
-        --exclude '.bzr/'
-        --exclude '*.tar.*'
-        --exclude '*.tar'
-      )
-    fi
+    # Fallback mode: if no local config found, create simple archive in current directory
+    RSYNC_EXCLUDES=(
+      --exclude '.svn/'
+      --exclude '.hg/'
+      --exclude '.bzr/'
+      --exclude '*.tar.*'
+      --exclude '*.tar'
+    )
     CREATE_COMPRESSED_ARCHIVE=true
     # Archive to parent directory by default (like tar stash behavior)
     ARCHIVE_BASE_DIR="$(dirname "$(realpath "$project_root")")"
 
-    if [[ "$TYPE_CONFIG_LOADED" == "true" ]]; then
-      echo "Type configuration loaded - creating archive in current directory"
-    else
-      echo "No configuration found - creating archive in current directory"
-    fi
+    echo "No configuration found - creating archive in current directory"
   fi
 }
 
@@ -180,7 +138,6 @@ DESCRIPTION:
   - Whether a local .ilma.conf file was found
   - Resolved backup and archive directory paths
   - Archive creation settings and limits
-  - File extensions being tracked
 
   This is useful for troubleshooting configuration issues and
   understanding which settings will be applied during backup operations.
@@ -239,19 +196,10 @@ show_config() {
 }
 
 parse_config_arguments() {
-  type_name=""
   project_path=""
 
   while (($# > 0)); do
     case "$1" in
-      --type)
-        if [[ -z "${2:-}" ]]; then
-          echo "Error: --type requires an argument" >&2
-          exit 1
-        fi
-        type_name="$2"
-        shift 2
-        ;;
       -h | --help)
         usage
         ;;
@@ -262,8 +210,6 @@ parse_config_arguments() {
       *)
         if [[ -z "$project_path" ]]; then
           project_path="$1"
-        elif [[ -z "$type_name" ]]; then
-          type_name="${type_name:-$1}"
         else
           echo "Error: Too many positional arguments" >&2
           exit 1
@@ -282,7 +228,7 @@ config_main() {
   parse_config_arguments "$@"
   local project_root
   project_root="$(require_project_root "$project_path")"
-  load_config "$project_root" "$type_name"
+  load_config "$project_root"
   show_config "$project_root"
 }
 

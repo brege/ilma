@@ -1,0 +1,36 @@
+# Copy to .ilma.conf in your project root and keep it small.
+# All values are optional. Defaults come from config.ini.
+
+# Exclude paths from local backup and archive creation.
+RSYNC_EXCLUDES=(
+#  --exclude '.git/'
+#  --exclude 'node_modules/'
+#  --exclude 'dist/'
+)
+
+# Where backup directories and archives should be written.
+# Empty means "next to the target".
+#BACKUP_BASE_DIR=""
+#ARCHIVE_BASE_DIR=""
+
+# Archive behavior.
+#CREATE_COMPRESSED_ARCHIVE=true
+#MAX_ARCHIVES=5
+#VERSIONING="timestamp"          # timestamp | numbered | overwrite
+
+# Compression overrides.
+#COMPRESSION_TYPE="zstd"         # zstd | gzip | bzip2 | xz | none
+#COMPRESSION_LEVEL="3"
+
+# Verification and hashing.
+#VERIFY=true
+#HASH_ALGORITHM="sha256"
+
+# GPG overrides.
+#GPG_KEY_ID=""
+#GPG_OUTPUT_EXTENSION=".gpg"
+
+# Remote sync defaults.
+#REMOTE_SERVER=""
+#REMOTE_PATH=""
+#CLEANUP_AFTER_TRANSFER="false"

@@ -22,21 +22,3 @@ fi
 if [[ "$config_found" == false ]]; then
   echo "INFO:No per-project config (.ilma.conf) detected - using default"
 fi
-
-# Load project config to check PROJECT_TYPE
-if [[ -f "$PROJECT_ROOT/.ilma.conf" ]]; then
-  source "$PROJECT_ROOT/.ilma.conf" 2>/dev/null || true
-fi
-
-# Validate PROJECT_TYPE if specified
-if [[ -n "${PROJECT_TYPE:-}" ]]; then
-  SCRIPT_DIR="$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")"
-  ILMA_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
-  source "$ILMA_DIR/lib/configs.sh"
-
-  if type_config="$(resolve_ilma_type_config "$PROJECT_TYPE")"; then
-    echo "PASS:PROJECT_TYPE inheritance ($PROJECT_TYPE)"
-  else
-    echo "FAIL:PROJECT_TYPE inheritance:Type config for '$PROJECT_TYPE' not found"
-  fi
-fi

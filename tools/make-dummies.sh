@@ -162,13 +162,10 @@ export const parseJSON = (str) => {
 EOF
 
 cat >"$JS_DIR/.ilma.conf" <<'EOF'
-# JS project configuration - archive, backup, context
-EXTENSIONS=(js json md css)
+# JS project configuration
 BACKUP_XDG_DIRS=false
-# ABC directories relative to dummy-project-*/
 BACKUP_BASE_DIR="../backup"
 ARCHIVE_BASE_DIR="../archive"
-CONTEXT_BASE_DIR="../context"
 CREATE_COMPRESSED_ARCHIVE=true
 MAX_ARCHIVES=3
 
@@ -180,10 +177,6 @@ RSYNC_EXCLUDES+=(
     --exclude '.next/'
     --exclude 'coverage/'
 )
-
-CONTEXT_FILES=()
-
-TREE_EXCLUDES+="|node_modules|dist|build"
 EOF
 
 # --- Dummy LaTeX Project ---
@@ -276,7 +269,6 @@ EOF
 
 cat >"$RECURSIVE_DIR/.ilma.conf" <<'EOF'
 # Recursive test project - backup inside project
-EXTENSIONS=(py txt md)
 BACKUP_XDG_DIRS=false
 BACKUP_BASE_DIR="."
 CREATE_COMPRESSED_ARCHIVE=false
@@ -286,9 +278,6 @@ RSYNC_EXCLUDES+=(
     --exclude '*.pyc'
     --exclude 'venv/'
 )
-
-CONTEXT_FILES=()
-TREE_EXCLUDES+="|__pycache__|venv"
 EOF
 
 # --- Large Project for Console Hanging Test ---
@@ -332,7 +321,7 @@ echo "  • dummy-project-recursive - Project with backup recursion risk"
 echo "  • dummy-project-large     - Large mixed project"
 echo
 echo "Usage examples:"
-echo "  ilma $TARGET_DIR/dummy-project-python --type python"
+echo "  ilma $TARGET_DIR/dummy-project-python"
 echo "  ilma $TARGET_DIR/dummy-project-js"
 echo "  ilma $TARGET_DIR/dummy-project-recursive"
 echo "  ilma backup $TARGET_DIR/dummy-project-large"
