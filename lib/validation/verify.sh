@@ -112,38 +112,3 @@ REMOTE_HASH_SH
     return 1
   fi
 }
-
-# Verify a mirror (rsync) by running a checksum dry-run
-# Uses RSYNC_EXCLUDES from the current config context.
-verify_mirror_integrity() {
-  local source_dir="$1"
-  local dest_dir="$2"
-
-  if [[ ! -d "$dest_dir" ]]; then
-    echo "Error: Destination mirror not found: $dest_dir" >&2
-    return 1
-  fi
-
-  local -a args=("--recursive" "--checksum" "--dry-run" "--delete" "--links" "--info=progress2")
-  if ilma_rsync_supports_capability "acl"; then
-    args+=("--acls")
-  fi
-  if ilma_rsync_supports_capability "xattr"; then
-    args+=("--xattrs")
-  fi
-  for exclude in "${RSYNC_EXCLUDES[@]}"; do
-    if [[ "$exclude" == --exclude* ]]; then
-      args+=("$exclude")
-    fi
-  done
-
-  echo "Verifying mirror integrity (checksum dry-run)..."
-  if diffout=$(rsync "${args[@]}" "$source_dir/" "$dest_dir/" 2>&1) && [[ -z "$diffout" ]]; then
-    echo "Mirror verified: no differences"
-    return 0
-  else
-    echo "$diffout"
-    echo "Mirror verify FAILED: differences detected" >&2
-    return 1
-  fi
-}
